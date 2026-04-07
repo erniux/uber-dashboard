@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Django
+db.sqlite3
+*.log
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# VSCode
+.vscode/
+
+# macOS
+.DS_Store
+
+# Docker
+postgres_data/
+*.pid
+
+# Static/media temporales
+media/
+staticfiles/
+
+# Node por si luego agregas frontend
+node_modules/
+dist/
+build/
+
+# Python tooling
+.mypy_cache/
+ruff_cache/
+
+#PROMPTS
+PROMPT.md
+
+# JSON files
+backend/uber_details_input/
