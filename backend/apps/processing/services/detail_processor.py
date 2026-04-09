@@ -171,3 +171,6 @@ def process_pending_details():
         "failed_records": failed_count,
         "skipped_without_real_payload": skipped_without_real_payload,
     }
+
+def extract_detail_fields(raw_data):
+    pass
