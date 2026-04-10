@@ -17,7 +17,7 @@ class UberTrip(models.Model):
         related_name="uber_trip",
         limit_choices_to={"payload_type": RawPayload.PayloadType.DETAIL},
     )
-    external_uuid = models.CharField(max_length=255, unique=True)
+    uuid = models.CharField(max_length=255, unique=True)
 
     status_type = models.CharField(max_length=50, blank=True, default="")
     is_completed = models.BooleanField(default=False)
@@ -74,4 +74,4 @@ class UberTrip(models.Model):
         verbose_name_plural = "Uber Trips"
 
     def __str__(self):
-        return f"{self.service_type or 'Trip'} - {self.external_uuid}"
+        return f"{self.service_type or 'Trip'} - {self.uuid}"

@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
-from urllib.parse import urlparse, parse_qs, unquote
 import re
+from urllib.parse import parse_qs, unquote, urlparse
 
 
 def find_component(cards, component_type):
@@ -90,13 +90,13 @@ def parse_duration_minutes(value):
 
 def parse_requested_at(timestamp_value):
     """
-    Convierte unix timestamp a datetime naive.
+    Convierte unix timestamp a datetime aware en UTC.
     """
     if timestamp_value in (None, ""):
         return None
 
     try:
-        return datetime.fromtimestamp(timestamp_value)
+        return datetime.fromtimestamp(timestamp_value, tz=timezone.utc)
     except (TypeError, ValueError, OSError):
         return None
 
@@ -262,83 +262,6 @@ def extract_basic_trip_data(raw_data):
         "is_canceled": metadata.get("statusType") == "CANCELED",
         "service_type": service_type,
         "service_group": derive_service_group(service_type),
-        "requested_at": requested_at,
-        "timezone": metadata.get("timeZone"),
-        "requested_date": requested_at.date() if requested_at else None,
-        "requested_time": requested_at.time() if requested_at else None,
-        "day_of_week": requested_at.strftime("%A") if requested_at else None,
-        "hour_of_day": hour_of_day,
-        "time_bucket": derive_time_bucket(hour_of_day),
-        "distance_km": parse_distance_km(distance_value),
-        "duration_minutes": parse_duration_minutes(duration_value),
-        "trip_leg_count": metadata.get("tripLegCount") or 0,
-        "is_pool_type": bool(metadata.get("isPoolType")),
-        "is_surge": bool(metadata.get("isSurge")),
-        "pickup_address": pickup_address,
-        "dropoff_address": dropoff_address,
-        "pickup_lat": coordinates["pickup_lat"],
-        "pickup_lng": coordinates["pickup_lng"],
-        "dropoff_lat": coordinates["dropoff_lat"],
-        "dropoff_lng": coordinates["dropoff_lng"],
-        "gross_amount": parse_money(metadata.get("formattedTotal")),
-        "extra_attributes": {
-            "hero_text": hero.get("text"),
-            "hero_date_requested": hero.get("dateRequested"),
-            "hero_time_requested": hero.get("timeRequested"),
-        },
-    }
-    """
-    Extrae solo campos básicos del payload detail.
-    No crea nada en DB todavía.
-    """
-    if not isinstance(raw_data, dict):
-        return {}
-
-    data = raw_data.get("data", {})
-    cards = data.get("cards", [])
-    metadata = data.get("metadata", {}) or {}
-
-    hero = find_component(cards, "heroV2") or {}
-    stat_table = find_component(cards, "statTable") or {}
-    address_block = find_component(cards, "addressBlockV2") or {}
-
-    stats = stat_table.get("stats", []) or []
-    addresses = address_block.get("addresses", []) or []
-
-    duration_value = None
-    distance_value = None
-
-    for stat in stats:
-        label = (stat.get("label") or "").strip().lower()
-        if "duración" in label:
-            duration_value = stat.get("value")
-        elif "distancia" in label:
-            distance_value = stat.get("value")
-
-    pickup_address = None
-    dropoff_address = None
-
-    for address_item in addresses:
-        address_type = address_item.get("type")
-        address_text = address_item.get("address")
-
-        if address_type == "PICKUP":
-            pickup_address = address_text
-        elif address_type == "DROPOFF":
-            dropoff_address = address_text
-
-    requested_at = parse_requested_at(metadata.get("requestedAt"))
-    hour_of_day = requested_at.hour if requested_at else None
-
-    coordinates = extract_coordinates_from_map_url(metadata.get("customRouteMap"))
-
-    return {
-        "uuid": metadata.get("uuid"),
-        "status_type": metadata.get("statusType"),
-        "is_completed": metadata.get("statusType") == "COMPLETED",
-        "is_canceled": metadata.get("statusType") == "CANCELED",
-        "service_type": metadata.get("vehicleType") or hero.get("vehicleType"),
-        "service_group": derive_service_group(metadata.get("vehicleType") or hero.get("vehicleType")),
         "requested_at": requested_at,
         "timezone": metadata.get("timeZone"),
         "requested_date": requested_at.date() if requested_at else None,

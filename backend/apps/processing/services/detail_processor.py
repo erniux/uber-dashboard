@@ -1,8 +1,8 @@
 from django.utils import timezone
 
+from apps.metrics.services.trip_upsert import upsert_uber_trip_from_payload
 from apps.payloads.models import RawPayload
 from apps.processing.models import ProcessRun
-from apps.metrics.services.trip_upsert import upsert_uber_trip_from_payload
 
 def has_real_detail_payload(raw_data):
     """
@@ -88,23 +88,6 @@ def process_pending_details():
                 ]
             )
 
-            # ---------------------------------------------------------
-            # lógica real de uber_metrics.py
-            # ---------------------------------------------------------
-            upsert_uber_trip_from_payload(payload)
-
-            payload.processing_status = RawPayload.ProcessingStatus.PROCESSING
-            payload.processing_error = None
-            payload.processing_attempts += 1
-            payload.save(
-                update_fields=[
-                    "processing_status",
-                    "processing_error",
-                    "processing_attempts",
-                    "updated_at",
-                ]
-            )
-
             upsert_uber_trip_from_payload(payload)
 
             payload.processing_status = RawPayload.ProcessingStatus.PROCESSED
@@ -171,9 +154,3 @@ def process_pending_details():
         "failed_records": failed_count,
         "skipped_without_real_payload": skipped_without_real_payload,
     }
-
-def extract_detail_fields(raw_data):
-    pass
-
-def upsert_uber_trip_from_payload(payload):
-    pass
