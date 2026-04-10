@@ -174,3 +174,6 @@ def process_pending_details():
 
 def extract_detail_fields(raw_data):
     pass
+
+def upsert_uber_trip_from_payload(payload):
+    pass

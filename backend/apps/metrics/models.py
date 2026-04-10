@@ -17,13 +17,13 @@ class UberTrip(models.Model):
         related_name="uber_trip",
         limit_choices_to={"payload_type": RawPayload.PayloadType.DETAIL},
     )
-    uuid = models.CharField(max_length=255, unique=True)
+    external_uuid = models.CharField(max_length=255, unique=True)
 
-    status_type = models.CharField(max_length=50, blank=True, null=True)
+    status_type = models.CharField(max_length=50, blank=True, default="")
     is_completed = models.BooleanField(default=False)
     is_canceled = models.BooleanField(default=False)
 
-    service_type = models.CharField(max_length=100, blank=True, null=True)
+    service_type = models.CharField(max_length=100, blank=True, default="")
     service_group = models.CharField(
         max_length=20,
         choices=SERVICE_GROUP_CHOICES,
@@ -31,13 +31,13 @@ class UberTrip(models.Model):
     )
 
     requested_at = models.DateTimeField(blank=True, null=True)
-    timezone = models.CharField(max_length=100, blank=True, null=True)
+    timezone = models.CharField(max_length=100, blank=True, default="")
 
     requested_date = models.DateField(blank=True, null=True)
     requested_time = models.TimeField(blank=True, null=True)
-    day_of_week = models.CharField(max_length=20, blank=True, null=True)
+    day_of_week = models.CharField(max_length=20, blank=True, default="")
     hour_of_day = models.PositiveSmallIntegerField(blank=True, null=True)
-    time_bucket = models.CharField(max_length=20, blank=True, null=True)
+    time_bucket = models.CharField(max_length=20, blank=True, default="")
 
     distance_km = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     duration_minutes = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
@@ -45,8 +45,8 @@ class UberTrip(models.Model):
     is_pool_type = models.BooleanField(default=False)
     is_surge = models.BooleanField(default=False)
 
-    pickup_address = models.TextField(blank=True, null=True)
-    dropoff_address = models.TextField(blank=True, null=True)
+    pickup_address = models.TextField(blank=True, default="")
+    dropoff_address = models.TextField(blank=True, default="")
 
     pickup_lat = models.DecimalField(max_digits=10, decimal_places=6, blank=True, null=True)
     pickup_lng = models.DecimalField(max_digits=10, decimal_places=6, blank=True, null=True)
@@ -74,4 +74,4 @@ class UberTrip(models.Model):
         verbose_name_plural = "Uber Trips"
 
     def __str__(self):
-        return f"{self.service_type or 'Trip'} - {self.uuid}"
+        return f"{self.service_type or 'Trip'} - {self.external_uuid}"
