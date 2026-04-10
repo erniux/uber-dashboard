@@ -48,16 +48,57 @@ function KpiCard({ eyebrow, title, value, tone = "default" }) {
   );
 }
 
-function DataTable({ title, columns, rows, emptyMessage }) {
+async function copyText(text) {
+  if (!text) {
+    return;
+  }
+
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "absolute";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  document.body.removeChild(textarea);
+}
+
+function PanelShell({ eyebrow, title, children, defaultCollapsed = false, actions = null, className = "" }) {
+  const [collapsed, setCollapsed] = useState(defaultCollapsed);
+
   return (
-    <section className="panel">
+    <section className={`panel ${className}`}>
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">Detalle</p>
+          <p className="eyebrow">{eyebrow}</p>
           <h2>{title}</h2>
+        </div>
+        <div className="panel-actions">
+          {actions}
+          <button
+            className="ghost-button ghost-button--compact"
+            type="button"
+            onClick={() => setCollapsed((value) => !value)}
+          >
+            {collapsed ? "Expandir" : "Ocultar"}
+          </button>
         </div>
       </div>
 
+      {!collapsed ? children : null}
+    </section>
+  );
+}
+
+function DataTable({ title, columns, rows, emptyMessage, eyebrow = "Detalle", defaultCollapsed = false }) {
+  return (
+    <PanelShell eyebrow={eyebrow} title={title} defaultCollapsed={defaultCollapsed}>
       {rows.length === 0 ? (
         <p className="empty-state">{emptyMessage}</p>
       ) : (
@@ -82,13 +123,13 @@ function DataTable({ title, columns, rows, emptyMessage }) {
           </table>
         </div>
       )}
-    </section>
+    </PanelShell>
   );
 }
 
 async function copyListToClipboard(rows) {
   const text = rows.map((row) => row.external_uuid).filter(Boolean).join("\n");
-  await navigator.clipboard.writeText(text);
+  await copyText(text);
 }
 
 function QueuePanel({ title, eyebrow, caption, rows, buttonLabel }) {
@@ -97,50 +138,51 @@ function QueuePanel({ title, eyebrow, caption, rows, buttonLabel }) {
   }
 
   return (
-    <section className="panel panel--queue">
-      <div className="panel-heading">
-        <div>
-          <p className="eyebrow">{eyebrow}</p>
-          <h2>{title}</h2>
-        </div>
+    <PanelShell
+      eyebrow={eyebrow}
+      title={title}
+      className="panel--queue"
+      defaultCollapsed={rows.length > 10}
+      actions={
         <button className="ghost-button ghost-button--compact" type="button" onClick={handleCopy} disabled={!rows.length}>
           {buttonLabel}
         </button>
-      </div>
-
+      }
+    >
       {rows.length === 0 ? <p className="empty-state">{caption}</p> : (
         <>
           <p className="queue-caption">{caption}</p>
           <div className="uuid-chip-list">
             {rows.map((row) => (
-              <code key={row.id} className="uuid-chip">
-                {row.external_uuid}
-              </code>
+              <div key={row.id} className="uuid-chip">
+                <code>{row.external_uuid}</code>
+                <button
+                  type="button"
+                  className="chip-copy"
+                  onClick={() => copyText(row.external_uuid)}
+                  title={`Copiar ${row.external_uuid}`}
+                >
+                  Copiar
+                </button>
+              </div>
             ))}
           </div>
         </>
       )}
-    </section>
+    </PanelShell>
   );
 }
 
 function WorkflowStatusPanel({ queueSummary }) {
   const cards = [
-    { label: "Activities pendientes", value: queueSummary.pending_activity_count },
-    { label: "UUIDs por descargar", value: queueSummary.pending_download_count },
-    { label: "Details subidos por procesar", value: queueSummary.uploaded_pending_processing_count },
-    { label: "Details procesados", value: queueSummary.processed_detail_count },
+    { label: "Paso 1 · Activities por procesar", value: queueSummary.pending_activity_count },
+    { label: "Paso 2 · UUIDs detail por descargar", value: queueSummary.pending_download_count },
+    { label: "Paso 3 · Details reales subidos", value: queueSummary.uploaded_pending_processing_count },
+    { label: "Paso 4 · Details procesados", value: queueSummary.processed_detail_count },
   ];
 
   return (
-    <section className="panel panel--workflow">
-      <div className="panel-heading">
-        <div>
-          <p className="eyebrow">Estado del flujo</p>
-          <h2>¿En dónde estás parado?</h2>
-        </div>
-      </div>
-
+    <PanelShell eyebrow="Estado del flujo" title="¿En dónde estás parado?" className="panel--workflow">
       <div className="workflow-grid">
         {cards.map((card) => (
           <div key={card.label} className="workflow-card">
@@ -148,6 +190,101 @@ function WorkflowStatusPanel({ queueSummary }) {
             <strong>{formatDecimal(card.value)}</strong>
           </div>
         ))}
+      </div>
+    </PanelShell>
+  );
+}
+
+function WorkflowGuidePanel() {
+  const steps = [
+    "Paso 1: sube los chunks de activities y procesalos.",
+    "Paso 2: usa los UUIDs generados para descargar manualmente los details desde Uber.",
+    "Paso 3: sube los payloads reales de details al sistema.",
+    "Paso 4: procesa esos details reales para convertirlos en UberTrip.",
+  ];
+
+  return (
+    <section className="panel panel--guide">
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">Cómo leer esto</p>
+          <h2>Guía rápida del flujo</h2>
+        </div>
+      </div>
+
+      <div className="guide-list">
+        {steps.map((step) => (
+          <p key={step}>{step}</p>
+        ))}
+      </div>
+
+      <p className="guide-note">
+        Nota importante: en la base de datos puede haber muchos `detail` con status `pending`, pero eso no significa
+        que todos estén listos para procesarse. Los placeholders vacíos siguen en paso 2 hasta que subas su JSON real.
+      </p>
+    </section>
+  );
+}
+
+function DetailLookupPanel({ lookupUuid, setLookupUuid, lookupResult, lookupLoading, onLookup }) {
+  function renderStatus() {
+    if (!lookupResult) {
+      return "Escribe un UUID detail para saber exactamente en qué paso va.";
+    }
+
+    if (!lookupResult.found) {
+      return lookupResult.message;
+    }
+
+    const stepLabels = {
+      step_2_pending_download: "Paso 2 · Por descargar desde Uber",
+      step_3_uploaded: "Paso 3 · Detail subido y pendiente de procesar",
+      step_4_processed: "Paso 4 · Detail procesado",
+    };
+
+    return stepLabels[lookupResult.current_step] || "Estado desconocido";
+  }
+
+  return (
+    <section className="panel panel--lookup">
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">Rastreo por UUID</p>
+          <h2>Buscar un detail específico</h2>
+        </div>
+      </div>
+
+      <div className="lookup-form">
+        <input
+          value={lookupUuid}
+          onChange={(event) => setLookupUuid(event.target.value)}
+          placeholder="Pega aquí un UUID detail"
+        />
+        <button className="action-button" type="button" onClick={onLookup} disabled={lookupLoading}>
+          {lookupLoading ? "Buscando..." : "Buscar"}
+        </button>
+      </div>
+
+      <div className="lookup-result">
+        <p>{renderStatus()}</p>
+        {lookupResult?.found ? (
+          <div className="lookup-meta">
+            <div>
+              <span>Status</span>
+              <strong>{lookupResult.payload.processing_status}</strong>
+            </div>
+            <div>
+              <span>Intentos</span>
+              <strong>{lookupResult.payload.processing_attempts}</strong>
+            </div>
+            <div>
+              <span>Origen</span>
+              <strong title={lookupResult.payload.source_name || "Sin origen"}>
+                {lookupResult.payload.source_name || "Sin origen"}
+              </strong>
+            </div>
+          </div>
+        ) : null}
       </div>
     </section>
   );
@@ -157,18 +294,19 @@ function DetailQueuePanel({ pendingDownloadRows, uploadedPendingRows, queueSumma
   return (
     <>
       <WorkflowStatusPanel queueSummary={queueSummary} />
+      <WorkflowGuidePanel />
       <div className="table-grid">
         <QueuePanel
           title="Detail UUIDs por descargar"
           eyebrow="Paso 2"
-          caption="Procesa activities para generar placeholders. Luego usa esta lista para descargar manualmente los details desde Uber."
+          caption="Estos UUIDs todavía no tienen payload real dentro del sistema. Por eso pueden seguir apareciendo como pending en SQL y Process details no los cambia."
           rows={pendingDownloadRows}
           buttonLabel="Copiar UUIDs"
         />
         <QueuePanel
-          title="Details subidos por procesar"
-          eyebrow="Paso 4"
-          caption="Estos details ya fueron subidos al sistema. Solo falta ejecutar el procesamiento para normalizarlos en UberTrip."
+          title="Paso 3 · Details subidos"
+          eyebrow="Paso 3"
+          caption="Estos sí son los details reales que ya subiste. Aquí sí funciona el botón Process details para moverlos al paso 4."
           rows={uploadedPendingRows}
           buttonLabel="Copiar UUIDs"
         />
@@ -179,15 +317,15 @@ function DetailQueuePanel({ pendingDownloadRows, uploadedPendingRows, queueSumma
 
 function inferQueueMessage(queueSummary) {
   if (queueSummary.pending_activity_count > 0) {
-    return "Aún tienes activities pendientes por procesar.";
+    return "Tienes activities pendientes por procesar. Ese es el paso 1.";
   }
 
   if (queueSummary.pending_download_count > 0) {
-    return "Ya puedes descargar details desde Uber usando la lista de UUIDs pendientes.";
+    return "Tienes UUIDs detail por descargar. Es normal que esos placeholders sigan en pending hasta que subas el JSON real.";
   }
 
   if (queueSummary.uploaded_pending_processing_count > 0) {
-    return "Ya subiste details. El siguiente paso es procesarlos.";
+    return "Ya estás en el paso 3. Esos details reales sí pasarán al paso 4 cuando ejecutes Process details.";
   }
 
   if (queueSummary.processed_detail_count > 0) {
@@ -195,46 +333,6 @@ function inferQueueMessage(queueSummary) {
   }
 
   return "Aún no hay actividad en el pipeline. Empieza subiendo activities.";
-}
-
-function DetailQueueLegacyPanel({ rows }) {
-  async function copyAllUuids() {
-    const text = rows.map((row) => row.external_uuid).filter(Boolean).join("\n");
-    await navigator.clipboard.writeText(text);
-  }
-
-  return (
-    <section className="panel panel--queue">
-      <div className="panel-heading">
-        <div>
-          <p className="eyebrow">Descarga manual</p>
-          <h2>Detail UUIDs pendientes</h2>
-        </div>
-        <button className="ghost-button ghost-button--compact" type="button" onClick={copyAllUuids} disabled={!rows.length}>
-          Copiar lista
-        </button>
-      </div>
-
-      {rows.length === 0 ? (
-        <p className="empty-state">
-          Aún no hay UUIDs pendientes generados desde activities.
-        </p>
-      ) : (
-        <>
-          <p className="queue-caption">
-            Esta es tu lista operativa para ir a Uber, descargar manualmente los details y después subirlos en lote.
-          </p>
-          <div className="uuid-chip-list">
-            {rows.map((row) => (
-              <code key={row.id} className="uuid-chip">
-                {row.external_uuid}
-              </code>
-            ))}
-          </div>
-        </>
-      )}
-    </section>
-  );
 }
 
 function parsePayloadInput(rawText) {
@@ -294,6 +392,7 @@ function UploadPanel({
   busy,
 }) {
   const isDetail = payloadType === "detail";
+  const [collapsed, setCollapsed] = useState(payloadType === "detail");
 
   return (
     <section className="sidebar-card">
@@ -302,97 +401,133 @@ function UploadPanel({
           <p className="eyebrow">Carga</p>
           <h3>{title}</h3>
         </div>
-        <span className="pill">{payloadType}</span>
+        <div className="panel-actions">
+          <span className="pill">{payloadType}</span>
+          <button
+            className="ghost-button ghost-button--compact"
+            type="button"
+            onClick={() => setCollapsed((value) => !value)}
+          >
+            {collapsed ? "Expandir" : "Ocultar"}
+          </button>
+        </div>
       </div>
 
-      <label className="field">
-        <span>Source name</span>
-        <input value={sourceName} onChange={(event) => onChange("sourceName", event.target.value)} />
-      </label>
+      {!collapsed ? (
+        <>
+          <label className="field">
+            <span>Nombre del lote</span>
+            <input value={sourceName} onChange={(event) => onChange("sourceName", event.target.value)} />
+          </label>
 
-      <label className="field">
-        <span>{isDetail ? "External UUID opcional para carga manual" : "External UUID opcional"}</span>
-        <input value={externalUuid} onChange={(event) => onChange("externalUuid", event.target.value)} />
-      </label>
+          <label className="field">
+            <span>{isDetail ? "UUID opcional para carga manual" : "UUID opcional"}</span>
+            <input value={externalUuid} onChange={(event) => onChange("externalUuid", event.target.value)} />
+          </label>
 
-      <label className="field">
-        <span>{isDetail ? "Seleccionar varios archivos `.json`" : "Seleccionar archivo `.json`"}</span>
-        <input
-          type="file"
-          accept=".json,application/json"
-          multiple={isDetail}
-          onChange={onPickFile}
-        />
-      </label>
+          <label className="field">
+            <span>{isDetail ? "Seleccionar varios archivos `.json`" : "Seleccionar archivo `.json`"}</span>
+            <input
+              type="file"
+              accept=".json,application/json"
+              multiple={isDetail}
+              onChange={onPickFile}
+            />
+          </label>
 
-      {isDetail && selectedFilesCount > 0 ? (
-        <p className="helper-text">{selectedFilesCount} archivo(s) listos para carga masiva.</p>
+          {isDetail && selectedFilesCount > 0 ? (
+            <p className="helper-text">{selectedFilesCount} archivo(s) listos para carga masiva.</p>
+          ) : null}
+
+          <label className="field">
+            <span>
+              {isDetail
+                ? "Pega un objeto JSON, un arreglo JSON o usa selección múltiple de archivos"
+                : "Pega un objeto JSON para carga individual o un arreglo JSON para carga masiva"}
+            </span>
+            <textarea rows="10" value={value} onChange={(event) => onChange("rawText", event.target.value)} />
+          </label>
+
+          <button className="action-button" type="button" onClick={onSubmit} disabled={busy}>
+            {busy ? "Enviando..." : "Subir archivo"}
+          </button>
+        </>
       ) : null}
-
-      <label className="field">
-        <span>
-          {isDetail
-            ? "Pega un objeto JSON, un arreglo JSON o usa selección múltiple de archivos"
-            : "Pega un objeto JSON para carga individual o un arreglo JSON para carga masiva"}
-        </span>
-        <textarea rows="10" value={value} onChange={(event) => onChange("rawText", event.target.value)} />
-      </label>
-
-      <button className="action-button" type="button" onClick={onSubmit} disabled={busy}>
-        {busy ? "Enviando..." : "Subir payload"}
-      </button>
     </section>
   );
 }
 
 function ActionPanel({ onRunActivities, onRunDetails, onRunPipeline, busyAction }) {
+  const [collapsed, setCollapsed] = useState(false);
+
   return (
     <section className="sidebar-card">
       <div className="sidebar-card__header">
         <div>
-          <p className="eyebrow">Pipeline</p>
-          <h3>Procesamiento</h3>
+          <p className="eyebrow">Acciones</p>
+          <h3>Siguiente paso</h3>
         </div>
-      </div>
-
-      <div className="stacked-actions">
         <button
-          className="action-button"
+          className="ghost-button ghost-button--compact"
           type="button"
-          onClick={onRunActivities}
-          disabled={busyAction === "activities" || busyAction === "pipeline"}
+          onClick={() => setCollapsed((value) => !value)}
         >
-          {busyAction === "activities" ? "Procesando..." : "Procesar activities"}
-        </button>
-
-        <button
-          className="action-button"
-          type="button"
-          onClick={onRunDetails}
-          disabled={busyAction === "details" || busyAction === "pipeline"}
-        >
-          {busyAction === "details" ? "Procesando..." : "Procesar details"}
-        </button>
-
-        <button
-          className="action-button action-button--dark"
-          type="button"
-          onClick={onRunPipeline}
-          disabled={busyAction === "pipeline"}
-        >
-          {busyAction === "pipeline" ? "Corriendo pipeline..." : "Ejecutar pipeline completo"}
+          {collapsed ? "Expandir" : "Ocultar"}
         </button>
       </div>
+
+      {!collapsed ? (
+        <div className="stacked-actions">
+          <button
+            className="action-button"
+            type="button"
+            onClick={onRunActivities}
+            disabled={busyAction === "activities" || busyAction === "pipeline"}
+          >
+            {busyAction === "activities" ? "Preparando..." : "Preparar viajes base"}
+          </button>
+
+          <button
+            className="action-button"
+            type="button"
+            onClick={onRunDetails}
+            disabled={busyAction === "details" || busyAction === "pipeline"}
+          >
+            {busyAction === "details" ? "Procesando..." : "Procesar viajes completos"}
+          </button>
+
+          <button
+            className="action-button action-button--dark"
+            type="button"
+            onClick={onRunPipeline}
+            disabled={busyAction === "pipeline"}
+          >
+            {busyAction === "pipeline" ? "Corriendo flujo..." : "Ejecutar flujo completo"}
+          </button>
+        </div>
+      ) : null}
     </section>
   );
 }
 
 export default function App() {
+  const [theme, setTheme] = useState(() => {
+    if (typeof window === "undefined") {
+      return "light";
+    }
+
+    const storedTheme = window.localStorage.getItem("uber-dashboard-theme");
+    if (storedTheme === "dark" || storedTheme === "light") {
+      return storedTheme;
+    }
+
+    return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  });
   const [filters, setFilters] = useState({ startDate: "", endDate: "" });
   const [draftFilters, setDraftFilters] = useState({ startDate: "", endDate: "" });
   const [uploads, setUploads] = useState({
-    activity: { sourceName: "manual-activity", externalUuid: "", rawText: "", selectedFiles: [] },
-    detail: { sourceName: "manual-detail", externalUuid: "", rawText: "", selectedFiles: [] },
+    activity: { sourceName: "viajes-base", externalUuid: "", rawText: "", selectedFiles: [] },
+    detail: { sourceName: "viajes-completos", externalUuid: "", rawText: "", selectedFiles: [] },
   });
   const [summary, setSummary] = useState(null);
   const [serviceRows, setServiceRows] = useState([]);
@@ -415,6 +550,14 @@ export default function App() {
   const [actionMessage, setActionMessage] = useState("");
   const [busyUpload, setBusyUpload] = useState("");
   const [busyAction, setBusyAction] = useState("");
+  const [lookupUuid, setLookupUuid] = useState("");
+  const [lookupResult, setLookupResult] = useState(null);
+  const [lookupLoading, setLookupLoading] = useState(false);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    window.localStorage.setItem("uber-dashboard-theme", theme);
+  }, [theme]);
 
   useEffect(() => {
     let cancelled = false;
@@ -716,6 +859,35 @@ export default function App() {
     }
   }
 
+  async function runLookup() {
+    if (!lookupUuid.trim()) {
+      setLookupResult(null);
+      setActionMessage("Escribe un UUID detail para consultarlo.");
+      return;
+    }
+
+    setLookupLoading(true);
+    setActionMessage("");
+
+    try {
+      const response = await fetch(
+        `${PAYLOADS_API_BASE}/detail-lookup/?external_uuid=${encodeURIComponent(lookupUuid.trim())}`,
+      );
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(payload.message || "No se pudo consultar el UUID.");
+      }
+
+      setLookupResult(payload);
+    } catch (lookupError) {
+      setLookupResult(null);
+      setActionMessage(lookupError.message);
+    } finally {
+      setLookupLoading(false);
+    }
+  }
+
   const serviceColumns = [
     { key: "service_type", label: "Servicio" },
     { key: "service_group", label: "Grupo" },
@@ -748,12 +920,23 @@ export default function App() {
     { key: "uploaded_at", label: "Cargado" },
   ];
 
+  function toggleTheme() {
+    setTheme((current) => (current === "dark" ? "light" : "dark"));
+  }
+
   return (
     <main className="dashboard-layout">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <p className="eyebrow">Uber Dashboard</p>
-          <h1>Consola operativa</h1>
+          <div className="sidebar-brand__top">
+            <div>
+              <p className="eyebrow">Uber Dashboard</p>
+              <h1>Consola operativa</h1>
+            </div>
+            <button className="ghost-button ghost-button--compact theme-toggle" type="button" onClick={toggleTheme}>
+              {theme === "dark" ? "Modo claro" : "Modo nocturno"}
+            </button>
+          </div>
           <p>
             Sube payloads, ejecuta el pipeline y revisa cómo impactan de inmediato en la capa analítica.
           </p>
@@ -943,12 +1126,22 @@ export default function App() {
             />
 
             <section className="table-grid">
+              <DetailLookupPanel
+                lookupUuid={lookupUuid}
+                setLookupUuid={setLookupUuid}
+                lookupResult={lookupResult}
+                lookupLoading={lookupLoading}
+                onLookup={runLookup}
+              />
               <DataTable
                 title="Tendencia diaria"
                 columns={dailyColumns}
                 rows={dailyRows}
                 emptyMessage="No hay datos diarios para el rango seleccionado."
               />
+            </section>
+
+            <section className="table-grid">
               <DataTable
                 title="UUIDs / estados recientes"
                 columns={payloadColumns}

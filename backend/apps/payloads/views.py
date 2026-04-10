@@ -8,6 +8,7 @@ from .serializers import (
     RawPayloadCreateSerializer,
     RawPayloadListSerializer,
     RawPayloadBulkCreateSerializer,
+    save_raw_payload,
 )
 
 
@@ -88,10 +89,12 @@ class RawPayloadBulkCreateView(APIView):
         items = serializer.validated_data["items"]
 
         created_count = 0
+        updated_count = 0
         duplicate_count = 0
         failed_count = 0
 
         created_items = []
+        updated_items = []
         duplicate_items = []
         failed_items = []
 
@@ -100,23 +103,29 @@ class RawPayloadBulkCreateView(APIView):
             raw_data = item["raw_data"]
 
             try:
-                payload = RawPayload.objects.create(
+                payload, created = save_raw_payload(
                     payload_type=payload_type,
                     source_name=source_name,
                     external_uuid=external_uuid,
                     raw_data=raw_data,
-                    ingestion_status=RawPayload.IngestionStatus.SAVED,
-                    processing_status=RawPayload.ProcessingStatus.PENDING,
-                    processing_attempts=0,
                 )
 
-                created_count += 1
-                created_items.append(
-                    {
-                        "id": payload.id,
-                        "external_uuid": payload.external_uuid,
-                    }
-                )
+                if created:
+                    created_count += 1
+                    created_items.append(
+                        {
+                            "id": payload.id,
+                            "external_uuid": payload.external_uuid,
+                        }
+                    )
+                else:
+                    updated_count += 1
+                    updated_items.append(
+                        {
+                            "id": payload.id,
+                            "external_uuid": payload.external_uuid,
+                        }
+                    )
 
             except IntegrityError:
                 duplicate_count += 1
@@ -142,10 +151,12 @@ class RawPayloadBulkCreateView(APIView):
                 "summary": {
                     "total_received": len(items),
                     "created": created_count,
+                    "updated": updated_count,
                     "duplicates": duplicate_count,
                     "failed": failed_count,
                 },
                 "created_items": created_items,
+                "updated_items": updated_items,
                 "duplicate_items": duplicate_items,
                 "failed_items": failed_items,
             },
@@ -198,6 +209,62 @@ class PayloadWorkQueueView(APIView):
                 },
                 "pending_download_items": pending_download_items,
                 "uploaded_pending_processing_items": uploaded_pending_processing_items,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class PayloadDetailLookupView(APIView):
+    def get(self, request, *args, **kwargs):
+        external_uuid = (request.query_params.get("external_uuid") or "").strip()
+
+        if not external_uuid:
+            return Response(
+                {
+                    "message": "Debes enviar el parámetro 'external_uuid'.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        payload = RawPayload.objects.filter(
+            payload_type=RawPayload.PayloadType.DETAIL,
+            external_uuid=external_uuid,
+        ).first()
+
+        if not payload:
+            return Response(
+                {
+                    "external_uuid": external_uuid,
+                    "found": False,
+                    "current_step": "not_found",
+                    "message": "No existe un detail con ese UUID en el sistema.",
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        has_real_payload = has_real_detail_payload(payload.raw_data)
+
+        if payload.processing_status == RawPayload.ProcessingStatus.PROCESSED:
+            current_step = "step_4_processed"
+        elif has_real_payload:
+            current_step = "step_3_uploaded"
+        else:
+            current_step = "step_2_pending_download"
+
+        return Response(
+            {
+                "external_uuid": external_uuid,
+                "found": True,
+                "current_step": current_step,
+                "payload": {
+                    "id": payload.id,
+                    "source_name": payload.source_name,
+                    "processing_status": payload.processing_status,
+                    "processing_attempts": payload.processing_attempts,
+                    "uploaded_at": payload.uploaded_at,
+                    "last_processed_at": payload.last_processed_at,
+                    "has_real_payload": has_real_payload,
+                },
             },
             status=status.HTTP_200_OK,
         )
