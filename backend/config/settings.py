@@ -22,6 +22,7 @@ INSTALLED_APPS = [
     "apps.payloads",
     "apps.processing",
     "apps.metrics",
+    "integrations",
 ]
 
 MIDDLEWARE = [
