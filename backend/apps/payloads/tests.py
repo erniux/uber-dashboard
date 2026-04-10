@@ -1,6 +1,7 @@
 from django.test import TestCase
 from rest_framework.test import APITestCase
 
+from apps.metrics.models import UberTrip
 from apps.payloads.models import RawPayload
 
 
@@ -33,6 +34,12 @@ class PayloadWorkQueueTests(APITestCase):
             raw_data={"uuid": "detail-processed", "payload": {"data": {"metadata": {"uuid": "detail-processed"}}}},
             processing_status=RawPayload.ProcessingStatus.PROCESSED,
         )
+        processed_payload = RawPayload.objects.get(external_uuid="detail-processed")
+        UberTrip.objects.create(
+            raw_payload=processed_payload,
+            uuid="detail-processed",
+            requested_date="2026-01-01",
+        )
 
         response = self.client.get("/api/payloads/work-queue/")
 
@@ -41,6 +48,7 @@ class PayloadWorkQueueTests(APITestCase):
         self.assertEqual(response.data["summary"]["pending_download_count"], 1)
         self.assertEqual(response.data["summary"]["uploaded_pending_processing_count"], 1)
         self.assertEqual(response.data["summary"]["processed_detail_count"], 1)
+        self.assertEqual(response.data["summary"]["processed_payload_count"], 1)
         self.assertEqual(response.data["pending_download_items"][0]["external_uuid"], "detail-placeholder")
         self.assertEqual(response.data["uploaded_pending_processing_items"][0]["external_uuid"], "detail-uploaded")
 

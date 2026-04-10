@@ -1,4 +1,5 @@
 from django.test import TestCase
+from rest_framework.test import APITestCase
 
 from apps.metrics.models import UberTrip
 from apps.payloads.models import RawPayload
@@ -123,3 +124,28 @@ class DetailProcessingTests(TestCase):
         self.assertEqual(result["processed_records"], 0)
         self.assertEqual(result["failed_records"], 1)
         self.assertEqual(process_run.status, ProcessRun.Status.FAILED)
+
+
+class ProcessRunsApiTests(APITestCase):
+    def test_runs_endpoint_returns_recent_process_runs(self):
+        ProcessRun.objects.create(
+            process_type=ProcessRun.ProcessType.ACTIVITIES,
+            status=ProcessRun.Status.COMPLETED,
+            total_records=10,
+            processed_records=10,
+            failed_records=0,
+        )
+        ProcessRun.objects.create(
+            process_type=ProcessRun.ProcessType.DETAILS,
+            status=ProcessRun.Status.FAILED,
+            total_records=4,
+            processed_records=3,
+            failed_records=1,
+        )
+
+        response = self.client.get("/api/processing/runs/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 2)
+        self.assertEqual(response.data[0]["process_type"], "details")
+        self.assertEqual(response.data[1]["status"], "completed")

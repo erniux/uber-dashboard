@@ -76,6 +76,15 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+
+UBER_APP_ID = os.getenv("UBER_APP_ID", default="")
+UBER_CLIENT_SECRET = os.getenv("UBER_CLIENT_SECRET", default="")
+UBER_REDIRECT_URI = os.getenv("UBER_REDIRECT_URI", default="")
+UBER_ORIGIN_BACKEND = os.getenv("UBER_ORIGIN_BACKEND", default="")
+UBER_ORIGIN_FRONTEND = os.getenv("UBER_ORIGIN_FRONTEND", default="")
+UBER_APP_NAME = os.getenv("UBER_APP_NAME", default="Data Dashboard Analysis")
+UBER_ENVIRONMENT = os.getenv("UBER_ENVIRONMENT", default="sandbox")
 
 REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [

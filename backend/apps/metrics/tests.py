@@ -300,6 +300,14 @@ class DashboardMetricsApiTests(APITestCase):
         self.assertEqual(response.data[0]["service_type"], "Uber X")
         self.assertEqual(response.data[1]["service_group"], "delivery")
 
+    def test_trips_endpoint_returns_normalized_trip_rows(self):
+        response = self.client.get("/api/metrics/trips/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 2)
+        self.assertEqual(response.data[0]["uuid"], "trip-2")
+        self.assertEqual(response.data[1]["status"], "completed")
+
     def test_invalid_date_returns_400(self):
         response = self.client.get("/api/metrics/summary/", {"start_date": "2024/04/10"})
 

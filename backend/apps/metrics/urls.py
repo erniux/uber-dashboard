@@ -5,6 +5,7 @@ from apps.metrics.views import (
     MetricsByServiceView,
     MetricsByTimeBucketView,
     MetricsSummaryView,
+    TripsListView,
 )
 
 
@@ -13,4 +14,5 @@ urlpatterns = [
     path("by-day/", MetricsByDayView.as_view(), name="metrics-by-day"),
     path("by-service/", MetricsByServiceView.as_view(), name="metrics-by-service"),
     path("by-time-bucket/", MetricsByTimeBucketView.as_view(), name="metrics-by-time-bucket"),
+    path("trips/", TripsListView.as_view(), name="metrics-trips"),
 ]

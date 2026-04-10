@@ -1,14 +1,14 @@
 # uber-dashboard
 
-Backend para ingestión, normalización y procesamiento de payloads de Uber usando **Django + Django REST Framework + PostgreSQL + Docker**.
+Backend para ingestión, normalización y procesamiento de payloads relacionados con actividad de Uber usando **Django + Django REST Framework + PostgreSQL + Docker**.
 
-Este proyecto forma parte de mi portafolio de aplicaciones y está orientado a construir un flujo sólido de procesamiento de datos, donde la **fuente principal de verdad es la base de datos**, no los archivos.
+Este proyecto forma parte de mi portafolio y está orientado a construir un flujo sólido de procesamiento de datos, donde la **fuente principal de verdad es la base de datos**, no los archivos.
 
 ---
 
 ## Objetivo del proyecto
 
-`uber-dashboard` busca centralizar y procesar información operativa de Uber a partir de payloads crudos, siguiendo un flujo controlado, trazable y preparado para escalar hacia métricas, análisis y visualización.
+`uber-dashboard` busca centralizar y procesar información operativa a partir de payloads crudos, siguiendo un flujo controlado, trazable y preparado para escalar hacia métricas, análisis y visualización.
 
 El sistema permite:
 
@@ -20,7 +20,7 @@ El sistema permite:
 - registrar cada ejecución mediante corridas de proceso (`ProcessRun`)
 - preparar una capa de normalización analítica mediante el modelo `UberTrip`
 
-A futuro, este proyecto integrará lógica de métricas y análisis para construir un dashboard operativo y analítico sobre actividad de Uber.
+A futuro, este proyecto integrará lógica de métricas, reportes y visualización para construir un dashboard operativo y analítico.
 
 ---
 
@@ -40,11 +40,14 @@ A futuro, este proyecto integrará lógica de métricas y análisis para constru
 ```text
 backend/
 ├─ config/
+│  ├─ settings.py
+│  └─ urls.py
 ├─ apps/
 │  ├─ payloads/
 │  ├─ processing/
 │  ├─ core/
-│  └─ metrics/
+│  ├─ metrics/
+│  └─ integrations/
 └─ uber_details_input/
 ```
 
@@ -58,6 +61,9 @@ Contiene la lógica de procesamiento de `activity` y `detail`, además del regis
 
 #### `metrics`
 Contiene la capa analítica en construcción, donde se normalizarán los details procesados en modelos útiles para métricas y explotación de datos, como `UberTrip`.
+
+#### `integrations`
+Espacio destinado para integraciones externas. Actualmente se dejó preparada la configuración base para una integración futura con Uber Developer Dashboard mediante variables de entorno y callback placeholder.
 
 ---
 
@@ -155,8 +161,11 @@ Actualmente el proyecto ya tiene implementado lo siguiente:
 - servicio `process_pending_details()`
 - endpoint para correr procesamiento de details
 - registro de corridas mediante `ProcessRun`
-- repositorio Git/GitHub inicializado
 - modelo `UberTrip` definido como base de normalización analítica
+- configuración base de integración con Uber Developer Dashboard
+- app y sandbox creados en Uber Developer Dashboard
+- configuración de `Origin URIs` y `Redirect URIs` para entorno local
+- variables de entorno preparadas para futura integración
 
 ---
 
@@ -191,6 +200,15 @@ POST /api/processing/activities/run/
 POST /api/processing/details/run/
 ```
 
+### Integrations
+
+#### Callback placeholder de Uber
+```http
+GET /api/integrations/uber/callback/
+```
+
+Este endpoint se dejó preparado como punto de retorno técnico para una integración futura. Actualmente funciona como placeholder y no ejecuta aún OAuth productivo, ya que la app no cuenta con scopes avanzados habilitados.
+
 ---
 
 ## Management commands disponibles
@@ -205,6 +223,52 @@ Este comando toma archivos JSON desde el directorio de entrada de details, ident
 
 ---
 
+## Integración con Uber Developer Dashboard
+
+Se creó una aplicación y un sandbox en **Uber Developer Dashboard** para documentar y preparar la base técnica de una futura integración.
+
+### Configuración realizada
+
+- creación de app principal
+- creación de sandbox app
+- generación de `Application ID`
+- generación de `Client Secret`
+- configuración de `Origin URIs` para entorno local
+- configuración de `Redirect URI` para callback local
+- configuración de datos públicos de la app
+
+### Estado actual
+
+Aunque la app quedó creada y configurada, actualmente **no cuenta con acceso a Authorization Code scopes avanzados**, por lo que no es posible usarla todavía como fuente directa de autenticación o extracción oficial de datos sensibles.
+
+Por esa razón, la estrategia actual del proyecto sigue enfocada en:
+
+- procesamiento de payloads propios
+- importación de archivos JSON
+- normalización y análisis desde base de datos
+
+La integración con Uber quedó registrada como **base técnica futura**, pero no es la fuente principal del pipeline actual.
+
+---
+
+## Variables de entorno
+
+Además de las variables tradicionales del proyecto, se añadieron estas variables para la integración base:
+
+```env
+UBER_APP_ID=
+UBER_CLIENT_SECRET=
+UBER_REDIRECT_URI=http://127.0.0.1:8000/api/integrations/uber/callback/
+UBER_ORIGIN_BACKEND=http://127.0.0.1:8000
+UBER_ORIGIN_FRONTEND=http://127.0.0.1:5173
+UBER_APP_NAME=Data Dashboard Analysis
+UBER_ENVIRONMENT=sandbox
+```
+
+> Estas credenciales no deben subirse al repositorio.
+
+---
+
 ## Principios técnicos del proyecto
 
 Este proyecto sigue estas decisiones de diseño:
@@ -215,6 +279,7 @@ Este proyecto sigue estas decisiones de diseño:
 - el estado del sistema se controla con campos de estatus, no con banderas booleanas simples
 - cada corrida de proceso queda registrada para trazabilidad
 - la normalización analítica se separa del almacenamiento crudo
+- las integraciones externas se documentan y aíslan sin frenar el pipeline principal
 
 ---
 
@@ -260,6 +325,8 @@ A la fecha, el proyecto ya cuenta con un pipeline base funcional:
 
 Además, ya se definió el modelo `UberTrip`, que será la base de la siguiente fase: convertir payloads procesados en información útil para análisis y métricas.
 
+También ya se dejó configurada una base técnica para integración con Uber Developer Dashboard, aunque por ahora el sistema principal continúa trabajando con datos importados y procesados internamente.
+
 ---
 
 ## Siguiente paso del proyecto
@@ -271,7 +338,7 @@ El siguiente paso técnico es conectar `process_pending_details()` con una capa 
 - haga upsert en `UberTrip`
 - deje listos los datos para métricas y consultas analíticas
 
-Esto permitirá que el proyecto evolucione de un pipeline de procesamiento crudo a una aplicación con valor analítico real.
+En paralelo, la integración con Uber puede seguir madurando a nivel técnico, pero sin bloquear el avance del pipeline principal.
 
 ---
 
@@ -284,6 +351,7 @@ Este proyecto está diseñado como base para:
 - trazabilidad de procesos backend
 - dashboards analíticos sobre datos transaccionales
 - explotación de datos por servicio, horario, distancia y monto
+- integración futura con servicios externos
 - evolución futura hacia métricas y visualización
 
 ---
@@ -300,6 +368,7 @@ Siguientes pasos planeados para el proyecto:
 - construir frontend para visualización
 - generar indicadores operativos y analíticos
 - fortalecer validaciones y observabilidad del pipeline
+- consolidar la app `integrations` para callbacks y pruebas futuras
 
 ---
 
@@ -317,6 +386,8 @@ Este proyecto demuestra habilidades en:
 - organización por servicios y responsabilidades
 - trabajo con Docker en entorno de desarrollo
 - control de versiones con Git y GitHub
+- preparación técnica de integraciones externas
+- diseño de pipelines orientados a análisis posterior
 
 ---
 
@@ -332,4 +403,4 @@ La base funcional del pipeline ya está implementada y probada. El siguiente enf
 
 **Erna Tercero Rodríguez**
 
-Proyecto desarrollado como parte de mi portafolio profesional en backend, data workflows y procesamiento de información.
+Proyecto desarrollado como parte de mi portafolio profesional en backend, data workflows, integración técnica y procesamiento de información.

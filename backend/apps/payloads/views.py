@@ -3,6 +3,8 @@ from rest_framework import status, generics
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.metrics.models import UberTrip
+
 from .models import RawPayload
 from .serializers import (
     RawPayloadCreateSerializer,
@@ -193,7 +195,8 @@ class PayloadWorkQueueView(APIView):
             if payload.processing_status == RawPayload.ProcessingStatus.PENDING:
                 uploaded_pending_processing_items.append(item)
 
-        processed_details_count = detail_payloads.filter(
+        processed_details_count = UberTrip.objects.count()
+        processed_payload_count = detail_payloads.filter(
             processing_status=RawPayload.ProcessingStatus.PROCESSED,
         ).count()
 
@@ -206,6 +209,7 @@ class PayloadWorkQueueView(APIView):
                     "pending_download_count": len(pending_download_items),
                     "uploaded_pending_processing_count": len(uploaded_pending_processing_items),
                     "processed_detail_count": processed_details_count,
+                    "processed_payload_count": processed_payload_count,
                 },
                 "pending_download_items": pending_download_items,
                 "uploaded_pending_processing_items": uploaded_pending_processing_items,

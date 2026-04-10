@@ -1,350 +1,226 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-const METRICS_API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000/api/metrics";
-const PAYLOADS_API_BASE = import.meta.env.VITE_PAYLOADS_API_BASE_URL ?? "http://127.0.0.1:8000/api/payloads";
-const PROCESSING_API_BASE =
-  import.meta.env.VITE_PROCESSING_API_BASE_URL ?? "http://127.0.0.1:8000/api/processing";
+const API_ROOT = import.meta.env.VITE_API_ROOT ?? "http://127.0.0.1:8000/api";
+const METRICS_API_BASE = `${API_ROOT}/metrics`;
+const PAYLOADS_API_BASE = `${API_ROOT}/payloads`;
+const PROCESSING_API_BASE = `${API_ROOT}/processing`;
+const AUTH_API_BASE = API_ROOT;
 
-const currencyFormatter = new Intl.NumberFormat("es-MX", {
-  style: "currency",
-  currency: "MXN",
-  maximumFractionDigits: 2,
-});
+const COPY = {
+  es: {
+    dashboard: "Dashboard",
+    trips: "Trips",
+    earnings: "Earnings",
+    heatmaps: "Heatmaps",
+    reports: "Reports",
+    settings: "Settings",
+    signIn: "Iniciar sesión",
+    loginCopy: "Entra a tu data product para explorar viajes, ganancias y operación.",
+    username: "Usuario",
+    password: "Contraseña",
+    enter: "Entrar",
+    entering: "Entrando...",
+    dark: "Modo oscuro",
+    light: "Modo claro",
+    lang: "EN",
+    signOut: "Salir",
+    todayTrips: "Viajes hoy",
+    totalTrips: "Viajes totales",
+    avgFare: "Tarifa promedio",
+    todayEarnings: "Ganancias totales",
+    recentTrips: "Viajes recientes",
+    serviceMix: "Trips by Service",
+    processingStatus: "Estado del pipeline",
+    step2: "Pendientes por descargar",
+    step3: "Detalles listos para procesar",
+    step4: "Viajes normalizados",
+    allTrips: "All Trips",
+    tripDetail: "Trip Detail",
+    advancedSearch: "Filters / Advanced Search",
+    exportData: "Export Data",
+    dailyEarnings: "Daily Earnings",
+    weeklyMonthly: "Weekly / Monthly",
+    byService: "Earnings by Service",
+    trends: "Earnings Trends",
+    tripsHeatmap: "Trips Heatmap",
+    pickupHotspots: "Pickup Hotspots",
+    dropoffHotspots: "Dropoff Hotspots",
+    timeHeatmap: "Time-based Heatmap",
+    processingRuns: "Processing Runs",
+    dataQuality: "Data Quality",
+    customReports: "Custom Reports",
+    exportReports: "Export Reports",
+    systemConfig: "System Config",
+    processingControls: "Processing Controls",
+    userSettings: "User Settings",
+    dataSources: "Data Sources",
+    uploadActivities: "Subir activities",
+    uploadDetails: "Subir details",
+    activityPayloads: "Payloads de activities",
+    detailPayloads: "Payloads de details",
+    batchName: "Nombre del lote",
+    optionalUuid: "UUID opcional",
+    optionalManualUuid: "UUID opcional para carga manual",
+    chooseJsonFile: "Seleccionar archivo .json",
+    chooseManyJson: "Seleccionar varios archivos .json",
+    pasteActivityJson: "Pega un objeto JSON para carga individual o un arreglo JSON para carga masiva",
+    pasteDetailJson: "Pega un objeto JSON, un arreglo JSON o usa selección múltiple de archivos",
+    sending: "Enviando...",
+    filesReady: "archivo(s) listos para carga masiva",
+    dropJson: "Arrastra y suelta aquí tus archivos JSON",
+    dropHint: "o usa el selector tradicional",
+    lastUpload: "Última carga",
+    uploadHistory: "Historial reciente",
+    pendingUuidList: "UUIDs pendientes por subir",
+    copyUuids: "Copiar UUIDs",
+    pendingUuidHelp: "Estos UUIDs ya fueron detectados desde activities, pero todavía falta subir sus details reales.",
+    created: "Creados",
+    updated: "Actualizados",
+    failed: "Fallidos",
+    duplicates: "Duplicados",
+    totalReceived: "Recibidos",
+    runActivities: "Preparar viajes base",
+    runDetails: "Procesar viajes completos",
+    runPipeline: "Ejecutar flujo completo",
+    empty: "Sin datos disponibles.",
+    loading: "Cargando dashboard...",
+    checking: "Validando sesión...",
+    from: "Desde",
+    to: "Hasta",
+    apply: "Aplicar",
+    clear: "Limpiar",
+    type: "Tipo",
+    service: "Servicio",
+    distance: "Distancia",
+    duration: "Duración",
+    earningsAmount: "Ganancia",
+    status: "Status",
+    uploaded: "Cargado",
+  },
+  en: {
+    dashboard: "Dashboard",
+    trips: "Trips",
+    earnings: "Earnings",
+    heatmaps: "Heatmaps",
+    reports: "Reports",
+    settings: "Settings",
+    signIn: "Sign in",
+    loginCopy: "Enter your data product to explore trips, earnings and operations.",
+    username: "Username",
+    password: "Password",
+    enter: "Enter",
+    entering: "Signing in...",
+    dark: "Dark mode",
+    light: "Light mode",
+    lang: "ES",
+    signOut: "Sign out",
+    todayTrips: "Trips today",
+    totalTrips: "Total trips",
+    avgFare: "Average fare",
+    todayEarnings: "Total earnings",
+    recentTrips: "Recent Trips",
+    serviceMix: "Trips by Service",
+    processingStatus: "Pipeline status",
+    step2: "Pending downloads",
+    step3: "Details ready to process",
+    step4: "Normalized trips",
+    allTrips: "All Trips",
+    tripDetail: "Trip Detail",
+    advancedSearch: "Filters / Advanced Search",
+    exportData: "Export Data",
+    dailyEarnings: "Daily Earnings",
+    weeklyMonthly: "Weekly / Monthly",
+    byService: "Earnings by Service",
+    trends: "Earnings Trends",
+    tripsHeatmap: "Trips Heatmap",
+    pickupHotspots: "Pickup Hotspots",
+    dropoffHotspots: "Dropoff Hotspots",
+    timeHeatmap: "Time-based Heatmap",
+    processingRuns: "Processing Runs",
+    dataQuality: "Data Quality",
+    customReports: "Custom Reports",
+    exportReports: "Export Reports",
+    systemConfig: "System Config",
+    processingControls: "Processing Controls",
+    userSettings: "User Settings",
+    dataSources: "Data Sources",
+    uploadActivities: "Upload activities",
+    uploadDetails: "Upload details",
+    activityPayloads: "Activity payloads",
+    detailPayloads: "Detail payloads",
+    batchName: "Batch name",
+    optionalUuid: "Optional UUID",
+    optionalManualUuid: "Optional UUID for manual upload",
+    chooseJsonFile: "Choose .json file",
+    chooseManyJson: "Choose multiple .json files",
+    pasteActivityJson: "Paste a JSON object for single upload or a JSON array for bulk upload",
+    pasteDetailJson: "Paste a JSON object, a JSON array or use multi-file selection",
+    sending: "Sending...",
+    filesReady: "file(s) ready for bulk upload",
+    dropJson: "Drag and drop your JSON files here",
+    dropHint: "or use the standard file picker",
+    lastUpload: "Last upload",
+    uploadHistory: "Recent history",
+    pendingUuidList: "UUIDs pending upload",
+    copyUuids: "Copy UUIDs",
+    pendingUuidHelp: "These UUIDs were detected from activities, but their real detail payloads are still missing.",
+    created: "Created",
+    updated: "Updated",
+    failed: "Failed",
+    duplicates: "Duplicates",
+    totalReceived: "Received",
+    runActivities: "Prepare base trips",
+    runDetails: "Process full trips",
+    runPipeline: "Run full flow",
+    empty: "No data available.",
+    loading: "Loading dashboard...",
+    checking: "Checking session...",
+    from: "From",
+    to: "To",
+    apply: "Apply",
+    clear: "Clear",
+    type: "Type",
+    service: "Service",
+    distance: "Distance",
+    duration: "Duration",
+    earningsAmount: "Earnings",
+    status: "Status",
+    uploaded: "Uploaded",
+  },
+};
 
-const decimalFormatter = new Intl.NumberFormat("es-MX", {
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 2,
-});
+const money = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 2 });
+const number = new Intl.NumberFormat("es-MX", { maximumFractionDigits: 2 });
+
+function formatMoney(value) { return money.format(Number(value ?? 0)); }
+function formatNumber(value, suffix = "") { return `${number.format(Number(value ?? 0))}${suffix}`; }
+
+async function fetchJson(url, options = {}) {
+  const response = await fetch(url, options);
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || payload.message || "Request failed.");
+  return payload;
+}
 
 function buildMetricsUrl(path, filters) {
   const url = new URL(`${METRICS_API_BASE}/${path}`);
-
-  if (filters.startDate) {
-    url.searchParams.set("start_date", filters.startDate);
-  }
-
-  if (filters.endDate) {
-    url.searchParams.set("end_date", filters.endDate);
-  }
-
+  if (filters.startDate) url.searchParams.set("start_date", filters.startDate);
+  if (filters.endDate) url.searchParams.set("end_date", filters.endDate);
   return url.toString();
 }
 
-function formatMoney(value) {
-  return currencyFormatter.format(Number(value ?? 0));
-}
-
-function formatDecimal(value, suffix = "") {
-  return `${decimalFormatter.format(Number(value ?? 0))}${suffix}`;
-}
-
-function KpiCard({ eyebrow, title, value, tone = "default" }) {
-  return (
-    <article className={`kpi-card kpi-card--${tone}`}>
-      <p className="eyebrow">{eyebrow}</p>
-      <h3>{title}</h3>
-      <strong>{value}</strong>
-    </article>
-  );
-}
-
-async function copyText(text) {
-  if (!text) {
-    return;
-  }
-
-  if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(text);
-    return;
-  }
-
-  const textarea = document.createElement("textarea");
-  textarea.value = text;
-  textarea.setAttribute("readonly", "");
-  textarea.style.position = "absolute";
-  textarea.style.left = "-9999px";
-  document.body.appendChild(textarea);
-  textarea.select();
-  document.execCommand("copy");
-  document.body.removeChild(textarea);
-}
-
-function PanelShell({ eyebrow, title, children, defaultCollapsed = false, actions = null, className = "" }) {
-  const [collapsed, setCollapsed] = useState(defaultCollapsed);
-
-  return (
-    <section className={`panel ${className}`}>
-      <div className="panel-heading">
-        <div>
-          <p className="eyebrow">{eyebrow}</p>
-          <h2>{title}</h2>
-        </div>
-        <div className="panel-actions">
-          {actions}
-          <button
-            className="ghost-button ghost-button--compact"
-            type="button"
-            onClick={() => setCollapsed((value) => !value)}
-          >
-            {collapsed ? "Expandir" : "Ocultar"}
-          </button>
-        </div>
-      </div>
-
-      {!collapsed ? children : null}
-    </section>
-  );
-}
-
-function DataTable({ title, columns, rows, emptyMessage, eyebrow = "Detalle", defaultCollapsed = false }) {
-  return (
-    <PanelShell eyebrow={eyebrow} title={title} defaultCollapsed={defaultCollapsed}>
-      {rows.length === 0 ? (
-        <p className="empty-state">{emptyMessage}</p>
-      ) : (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                {columns.map((column) => (
-                  <th key={column.key}>{column.label}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, index) => (
-                <tr key={`${title}-${index}`}>
-                  {columns.map((column) => (
-                    <td key={column.key}>{column.render ? column.render(row[column.key], row) : row[column.key]}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </PanelShell>
-  );
-}
-
-async function copyListToClipboard(rows) {
-  const text = rows.map((row) => row.external_uuid).filter(Boolean).join("\n");
-  await copyText(text);
-}
-
-function QueuePanel({ title, eyebrow, caption, rows, buttonLabel }) {
-  async function handleCopy() {
-    await copyListToClipboard(rows);
-  }
-
-  return (
-    <PanelShell
-      eyebrow={eyebrow}
-      title={title}
-      className="panel--queue"
-      defaultCollapsed={rows.length > 10}
-      actions={
-        <button className="ghost-button ghost-button--compact" type="button" onClick={handleCopy} disabled={!rows.length}>
-          {buttonLabel}
-        </button>
-      }
-    >
-      {rows.length === 0 ? <p className="empty-state">{caption}</p> : (
-        <>
-          <p className="queue-caption">{caption}</p>
-          <div className="uuid-chip-list">
-            {rows.map((row) => (
-              <div key={row.id} className="uuid-chip">
-                <code>{row.external_uuid}</code>
-                <button
-                  type="button"
-                  className="chip-copy"
-                  onClick={() => copyText(row.external_uuid)}
-                  title={`Copiar ${row.external_uuid}`}
-                >
-                  Copiar
-                </button>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-    </PanelShell>
-  );
-}
-
-function WorkflowStatusPanel({ queueSummary }) {
-  const cards = [
-    { label: "Paso 1 · Activities por procesar", value: queueSummary.pending_activity_count },
-    { label: "Paso 2 · UUIDs detail por descargar", value: queueSummary.pending_download_count },
-    { label: "Paso 3 · Details reales subidos", value: queueSummary.uploaded_pending_processing_count },
-    { label: "Paso 4 · Details procesados", value: queueSummary.processed_detail_count },
-  ];
-
-  return (
-    <PanelShell eyebrow="Estado del flujo" title="¿En dónde estás parado?" className="panel--workflow">
-      <div className="workflow-grid">
-        {cards.map((card) => (
-          <div key={card.label} className="workflow-card">
-            <span>{card.label}</span>
-            <strong>{formatDecimal(card.value)}</strong>
-          </div>
-        ))}
-      </div>
-    </PanelShell>
-  );
-}
-
-function WorkflowGuidePanel() {
-  const steps = [
-    "Paso 1: sube los chunks de activities y procesalos.",
-    "Paso 2: usa los UUIDs generados para descargar manualmente los details desde Uber.",
-    "Paso 3: sube los payloads reales de details al sistema.",
-    "Paso 4: procesa esos details reales para convertirlos en UberTrip.",
-  ];
-
-  return (
-    <section className="panel panel--guide">
-      <div className="panel-heading">
-        <div>
-          <p className="eyebrow">Cómo leer esto</p>
-          <h2>Guía rápida del flujo</h2>
-        </div>
-      </div>
-
-      <div className="guide-list">
-        {steps.map((step) => (
-          <p key={step}>{step}</p>
-        ))}
-      </div>
-
-      <p className="guide-note">
-        Nota importante: en la base de datos puede haber muchos `detail` con status `pending`, pero eso no significa
-        que todos estén listos para procesarse. Los placeholders vacíos siguen en paso 2 hasta que subas su JSON real.
-      </p>
-    </section>
-  );
-}
-
-function DetailLookupPanel({ lookupUuid, setLookupUuid, lookupResult, lookupLoading, onLookup }) {
-  function renderStatus() {
-    if (!lookupResult) {
-      return "Escribe un UUID detail para saber exactamente en qué paso va.";
-    }
-
-    if (!lookupResult.found) {
-      return lookupResult.message;
-    }
-
-    const stepLabels = {
-      step_2_pending_download: "Paso 2 · Por descargar desde Uber",
-      step_3_uploaded: "Paso 3 · Detail subido y pendiente de procesar",
-      step_4_processed: "Paso 4 · Detail procesado",
-    };
-
-    return stepLabels[lookupResult.current_step] || "Estado desconocido";
-  }
-
-  return (
-    <section className="panel panel--lookup">
-      <div className="panel-heading">
-        <div>
-          <p className="eyebrow">Rastreo por UUID</p>
-          <h2>Buscar un detail específico</h2>
-        </div>
-      </div>
-
-      <div className="lookup-form">
-        <input
-          value={lookupUuid}
-          onChange={(event) => setLookupUuid(event.target.value)}
-          placeholder="Pega aquí un UUID detail"
-        />
-        <button className="action-button" type="button" onClick={onLookup} disabled={lookupLoading}>
-          {lookupLoading ? "Buscando..." : "Buscar"}
-        </button>
-      </div>
-
-      <div className="lookup-result">
-        <p>{renderStatus()}</p>
-        {lookupResult?.found ? (
-          <div className="lookup-meta">
-            <div>
-              <span>Status</span>
-              <strong>{lookupResult.payload.processing_status}</strong>
-            </div>
-            <div>
-              <span>Intentos</span>
-              <strong>{lookupResult.payload.processing_attempts}</strong>
-            </div>
-            <div>
-              <span>Origen</span>
-              <strong title={lookupResult.payload.source_name || "Sin origen"}>
-                {lookupResult.payload.source_name || "Sin origen"}
-              </strong>
-            </div>
-          </div>
-        ) : null}
-      </div>
-    </section>
-  );
-}
-
-function DetailQueuePanel({ pendingDownloadRows, uploadedPendingRows, queueSummary }) {
-  return (
-    <>
-      <WorkflowStatusPanel queueSummary={queueSummary} />
-      <WorkflowGuidePanel />
-      <div className="table-grid">
-        <QueuePanel
-          title="Detail UUIDs por descargar"
-          eyebrow="Paso 2"
-          caption="Estos UUIDs todavía no tienen payload real dentro del sistema. Por eso pueden seguir apareciendo como pending en SQL y Process details no los cambia."
-          rows={pendingDownloadRows}
-          buttonLabel="Copiar UUIDs"
-        />
-        <QueuePanel
-          title="Paso 3 · Details subidos"
-          eyebrow="Paso 3"
-          caption="Estos sí son los details reales que ya subiste. Aquí sí funciona el botón Process details para moverlos al paso 4."
-          rows={uploadedPendingRows}
-          buttonLabel="Copiar UUIDs"
-        />
-      </div>
-    </>
-  );
-}
-
-function inferQueueMessage(queueSummary) {
-  if (queueSummary.pending_activity_count > 0) {
-    return "Tienes activities pendientes por procesar. Ese es el paso 1.";
-  }
-
-  if (queueSummary.pending_download_count > 0) {
-    return "Tienes UUIDs detail por descargar. Es normal que esos placeholders sigan en pending hasta que subas el JSON real.";
-  }
-
-  if (queueSummary.uploaded_pending_processing_count > 0) {
-    return "Ya estás en el paso 3. Esos details reales sí pasarán al paso 4 cuando ejecutes Process details.";
-  }
-
-  if (queueSummary.processed_detail_count > 0) {
-    return "El flujo ya avanzó hasta details procesados. Puedes revisar métricas o cargar nuevos chunks.";
-  }
-
-  return "Aún no hay actividad en el pipeline. Empieza subiendo activities.";
-}
-
 function parsePayloadInput(rawText) {
-  if (!rawText.trim()) {
-    throw new Error("Pega un JSON válido antes de enviarlo.");
-  }
-
+  if (!rawText.trim()) throw new Error("Pega un JSON válido antes de enviarlo.");
   try {
     return JSON.parse(rawText);
-  } catch (error) {
+  } catch {
     throw new Error("El contenido no es un JSON válido.");
   }
+}
+
+function inferExternalUuid(parsedValue) {
+  if (!parsedValue || typeof parsedValue !== "object" || Array.isArray(parsedValue)) return "";
+  return parsedValue.external_uuid ?? parsedValue.uuid ?? parsedValue?.metadata?.uuid ?? "";
 }
 
 function normalizeBulkItems(parsedValue) {
@@ -357,295 +233,159 @@ function normalizeBulkItems(parsedValue) {
       throw new Error(`El item ${index + 1} no es un objeto JSON válido.`);
     }
 
-    if ("raw_data" in item) {
-      return {
-        external_uuid: item.external_uuid ?? item.uuid ?? null,
-        raw_data: item.raw_data,
-      };
-    }
-
-    return {
-      external_uuid: item.external_uuid ?? item.uuid ?? null,
-      raw_data: item,
-    };
+    return "raw_data" in item
+      ? { external_uuid: item.external_uuid ?? item.uuid ?? null, raw_data: item.raw_data }
+      : { external_uuid: item.external_uuid ?? item.uuid ?? null, raw_data: item };
   });
 }
 
-function inferExternalUuid(parsedValue) {
-  if (!parsedValue || typeof parsedValue !== "object" || Array.isArray(parsedValue)) {
-    return "";
-  }
-
-  return parsedValue.external_uuid ?? parsedValue.uuid ?? parsedValue?.metadata?.uuid ?? "";
-}
-
-function UploadPanel({
-  title,
-  payloadType,
-  value,
-  sourceName,
-  externalUuid,
-  selectedFilesCount,
-  onChange,
-  onPickFile,
-  onSubmit,
-  busy,
-}) {
-  const isDetail = payloadType === "detail";
-  const [collapsed, setCollapsed] = useState(payloadType === "detail");
-
+function Login({ labels, credentials, setCredentials, onSubmit, busy }) {
   return (
-    <section className="sidebar-card">
-      <div className="sidebar-card__header">
-        <div>
-          <p className="eyebrow">Carga</p>
-          <h3>{title}</h3>
-        </div>
-        <div className="panel-actions">
-          <span className="pill">{payloadType}</span>
-          <button
-            className="ghost-button ghost-button--compact"
-            type="button"
-            onClick={() => setCollapsed((value) => !value)}
-          >
-            {collapsed ? "Expandir" : "Ocultar"}
-          </button>
-        </div>
-      </div>
-
-      {!collapsed ? (
-        <>
-          <label className="field">
-            <span>Nombre del lote</span>
-            <input value={sourceName} onChange={(event) => onChange("sourceName", event.target.value)} />
-          </label>
-
-          <label className="field">
-            <span>{isDetail ? "UUID opcional para carga manual" : "UUID opcional"}</span>
-            <input value={externalUuid} onChange={(event) => onChange("externalUuid", event.target.value)} />
-          </label>
-
-          <label className="field">
-            <span>{isDetail ? "Seleccionar varios archivos `.json`" : "Seleccionar archivo `.json`"}</span>
-            <input
-              type="file"
-              accept=".json,application/json"
-              multiple={isDetail}
-              onChange={onPickFile}
-            />
-          </label>
-
-          {isDetail && selectedFilesCount > 0 ? (
-            <p className="helper-text">{selectedFilesCount} archivo(s) listos para carga masiva.</p>
-          ) : null}
-
-          <label className="field">
-            <span>
-              {isDetail
-                ? "Pega un objeto JSON, un arreglo JSON o usa selección múltiple de archivos"
-                : "Pega un objeto JSON para carga individual o un arreglo JSON para carga masiva"}
-            </span>
-            <textarea rows="10" value={value} onChange={(event) => onChange("rawText", event.target.value)} />
-          </label>
-
-          <button className="action-button" type="button" onClick={onSubmit} disabled={busy}>
-            {busy ? "Enviando..." : "Subir archivo"}
-          </button>
-        </>
-      ) : null}
-    </section>
+    <main className="auth-shell">
+      <section className="auth-card">
+        <div className="brand-mark">Uber</div>
+        <h1>{labels.signIn}</h1>
+        <p>{labels.loginCopy}</p>
+        <form onSubmit={onSubmit} className="auth-form">
+          <label><span>{labels.username}</span><input value={credentials.username} onChange={(e) => setCredentials((c) => ({ ...c, username: e.target.value }))} /></label>
+          <label><span>{labels.password}</span><input type="password" value={credentials.password} onChange={(e) => setCredentials((c) => ({ ...c, password: e.target.value }))} /></label>
+          <button type="submit">{busy ? labels.entering : labels.enter}</button>
+        </form>
+      </section>
+    </main>
   );
 }
 
-function ActionPanel({ onRunActivities, onRunDetails, onRunPipeline, busyAction }) {
-  const [collapsed, setCollapsed] = useState(false);
-
+function ShellCard({ title, subtitle, children, actions = null }) {
   return (
-    <section className="sidebar-card">
-      <div className="sidebar-card__header">
-        <div>
-          <p className="eyebrow">Acciones</p>
-          <h3>Siguiente paso</h3>
-        </div>
-        <button
-          className="ghost-button ghost-button--compact"
-          type="button"
-          onClick={() => setCollapsed((value) => !value)}
-        >
-          {collapsed ? "Expandir" : "Ocultar"}
-        </button>
+    <section className="shell-card">
+      <div className="shell-card__head">
+        <div><p>{subtitle}</p><h3>{title}</h3></div>
+        {actions}
       </div>
-
-      {!collapsed ? (
-        <div className="stacked-actions">
-          <button
-            className="action-button"
-            type="button"
-            onClick={onRunActivities}
-            disabled={busyAction === "activities" || busyAction === "pipeline"}
-          >
-            {busyAction === "activities" ? "Preparando..." : "Preparar viajes base"}
-          </button>
-
-          <button
-            className="action-button"
-            type="button"
-            onClick={onRunDetails}
-            disabled={busyAction === "details" || busyAction === "pipeline"}
-          >
-            {busyAction === "details" ? "Procesando..." : "Procesar viajes completos"}
-          </button>
-
-          <button
-            className="action-button action-button--dark"
-            type="button"
-            onClick={onRunPipeline}
-            disabled={busyAction === "pipeline"}
-          >
-            {busyAction === "pipeline" ? "Corriendo flujo..." : "Ejecutar flujo completo"}
-          </button>
-        </div>
-      ) : null}
+      {children}
     </section>
   );
 }
 
 export default function App() {
-  const [theme, setTheme] = useState(() => {
-    if (typeof window === "undefined") {
-      return "light";
-    }
-
-    const storedTheme = window.localStorage.getItem("uber-dashboard-theme");
-    if (storedTheme === "dark" || storedTheme === "light") {
-      return storedTheme;
-    }
-
-    return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-  });
+  const [theme, setTheme] = useState(() => window.localStorage.getItem("uber-theme") || "dark");
+  const [language, setLanguage] = useState(() => window.localStorage.getItem("uber-language") || "es");
+  const [activeMenu, setActiveMenu] = useState("dashboard");
+  const [credentials, setCredentials] = useState({ username: "", password: "" });
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authBusy, setAuthBusy] = useState(false);
+  const [user, setUser] = useState(null);
   const [filters, setFilters] = useState({ startDate: "", endDate: "" });
   const [draftFilters, setDraftFilters] = useState({ startDate: "", endDate: "" });
+  const [summary, setSummary] = useState(null);
+  const [services, setServices] = useState([]);
+  const [timeBuckets, setTimeBuckets] = useState([]);
+  const [trips, setTrips] = useState([]);
+  const [runs, setRuns] = useState([]);
+  const [queue, setQueue] = useState(null);
+  const [payloads, setPayloads] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshTick, setRefreshTick] = useState(0);
+  const [busyAction, setBusyAction] = useState("");
+  const [busyUpload, setBusyUpload] = useState("");
+  const [uploadMessage, setUploadMessage] = useState("");
+  const [uploadSummary, setUploadSummary] = useState(null);
   const [uploads, setUploads] = useState({
     activity: { sourceName: "viajes-base", externalUuid: "", rawText: "", selectedFiles: [] },
     detail: { sourceName: "viajes-completos", externalUuid: "", rawText: "", selectedFiles: [] },
   });
-  const [summary, setSummary] = useState(null);
-  const [serviceRows, setServiceRows] = useState([]);
-  const [timeBucketRows, setTimeBucketRows] = useState([]);
-  const [dailyRows, setDailyRows] = useState([]);
-  const [recentPayloads, setRecentPayloads] = useState([]);
-  const [detailQueue, setDetailQueue] = useState({
-    summary: {
-      pending_activity_count: 0,
-      pending_download_count: 0,
-      uploaded_pending_processing_count: 0,
-      processed_detail_count: 0,
-    },
-    pending_download_items: [],
-    uploaded_pending_processing_items: [],
-  });
-  const [loading, setLoading] = useState(true);
-  const [refreshTick, setRefreshTick] = useState(0);
-  const [error, setError] = useState("");
-  const [actionMessage, setActionMessage] = useState("");
-  const [busyUpload, setBusyUpload] = useState("");
-  const [busyAction, setBusyAction] = useState("");
-  const [lookupUuid, setLookupUuid] = useState("");
-  const [lookupResult, setLookupResult] = useState(null);
-  const [lookupLoading, setLookupLoading] = useState(false);
+  const labels = COPY[language] || COPY.es;
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
-    window.localStorage.setItem("uber-dashboard-theme", theme);
+    window.localStorage.setItem("uber-theme", theme);
   }, [theme]);
 
   useEffect(() => {
+    window.localStorage.setItem("uber-language", language);
+  }, [language]);
+
+  useEffect(() => {
     let cancelled = false;
+    fetchJson(`${AUTH_API_BASE}/auth/me/`, { credentials: "include" })
+      .then((payload) => { if (!cancelled && payload.authenticated) setUser(payload.user); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setAuthLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
 
-    async function loadDashboard() {
-      setLoading(true);
-      setError("");
-
-      try {
-        const [summaryResponse, serviceResponse, timeBucketResponse, dailyResponse, payloadsResponse, detailQueueResponse] =
-          await Promise.all([
-            fetch(buildMetricsUrl("summary/", filters)),
-            fetch(buildMetricsUrl("by-service/", filters)),
-            fetch(buildMetricsUrl("by-time-bucket/", filters)),
-            fetch(buildMetricsUrl("by-day/", filters)),
-            fetch(`${PAYLOADS_API_BASE}/`),
-            fetch(`${PAYLOADS_API_BASE}/work-queue/`),
-          ]);
-
-        const responses = [
-          summaryResponse,
-          serviceResponse,
-          timeBucketResponse,
-          dailyResponse,
-          payloadsResponse,
-          detailQueueResponse,
-        ];
-        const failedResponse = responses.find((response) => !response.ok);
-
-        if (failedResponse) {
-          const payload = await failedResponse.json().catch(() => ({}));
-          throw new Error(payload.error || "No fue posible cargar el dashboard.");
-        }
-
-        const [summaryData, serviceData, timeBucketData, dailyData, payloadsData, detailQueueData] = await Promise.all(
-          responses.map((response) => response.json()),
-        );
-
-        if (cancelled) {
-          return;
-        }
-
+  useEffect(() => {
+    if (!user) return undefined;
+    let cancelled = false;
+    setLoading(true);
+    Promise.all([
+      fetchJson(buildMetricsUrl("summary/", filters)),
+      fetchJson(buildMetricsUrl("by-service/", filters)),
+      fetchJson(buildMetricsUrl("by-time-bucket/", filters)),
+      fetchJson(buildMetricsUrl("trips/", filters)),
+      fetchJson(`${PROCESSING_API_BASE}/runs/`),
+      fetchJson(`${PAYLOADS_API_BASE}/work-queue/`),
+      fetchJson(`${PAYLOADS_API_BASE}/`),
+    ])
+      .then(([summaryData, serviceData, timeData, tripData, runsData, queueData, payloadData]) => {
+        if (cancelled) return;
         setSummary(summaryData);
-        setServiceRows(serviceData);
-        setTimeBucketRows(timeBucketData);
-        setDailyRows(dailyData);
-        setRecentPayloads(Array.isArray(payloadsData) ? payloadsData.slice(0, 8) : []);
-        setDetailQueue(
-          detailQueueData && typeof detailQueueData === "object" && !Array.isArray(detailQueueData)
-            ? detailQueueData
-            : {
-                summary: {
-                  pending_activity_count: 0,
-                  pending_download_count: 0,
-                  uploaded_pending_processing_count: 0,
-                  processed_detail_count: 0,
-                },
-                pending_download_items: [],
-                uploaded_pending_processing_items: [],
-              },
-        );
-      } catch (fetchError) {
-        if (!cancelled) {
-          setError(fetchError.message || "Ocurrió un error al cargar el dashboard.");
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    }
+        setServices(serviceData);
+        setTimeBuckets(timeData);
+        setTrips(tripData);
+        setRuns(runsData);
+        setQueue(queueData);
+        setPayloads(Array.isArray(payloadData) ? payloadData.slice(0, 8) : []);
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [user, filters, refreshTick]);
 
-    loadDashboard();
+  const topMenus = useMemo(() => ([
+    { key: "dashboard", label: labels.dashboard },
+    { key: "trips", label: labels.trips },
+    { key: "earnings", label: labels.earnings },
+    { key: "heatmaps", label: labels.heatmaps },
+    { key: "reports", label: labels.reports },
+    { key: "settings", label: labels.settings },
+  ]), [labels]);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [filters, refreshTick]);
-
-  function handleSubmit(event) {
+  async function login(event) {
     event.preventDefault();
-    setFilters(draftFilters);
+    setAuthBusy(true);
+    try {
+      const payload = await fetchJson(`${AUTH_API_BASE}/auth/login/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(credentials),
+      });
+      setUser(payload.user);
+      setCredentials({ username: "", password: "" });
+    } finally {
+      setAuthBusy(false);
+    }
   }
 
-  function resetFilters() {
-    const nextFilters = { startDate: "", endDate: "" };
-    setDraftFilters(nextFilters);
-    setFilters(nextFilters);
+  async function logout() {
+    await fetchJson(`${AUTH_API_BASE}/auth/logout/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({}),
+    }).catch(() => {});
+    setUser(null);
+  }
+
+  async function runAction(url, key) {
+    setBusyAction(key);
+    try {
+      await fetchJson(url, { method: "POST" });
+      setRefreshTick((v) => v + 1);
+    } finally {
+      setBusyAction("");
+    }
   }
 
   function updateUploadState(payloadType, field, nextValue) {
@@ -660,497 +400,339 @@ export default function App() {
 
   async function handleFileSelection(payloadType, event) {
     const files = Array.from(event.target.files ?? []);
-
-    if (files.length === 0) {
-      return;
-    }
+    if (!files.length) return;
 
     try {
       if (payloadType === "detail" && files.length > 1) {
         const parsedFiles = await Promise.all(
           files.map(async (file) => {
-            const text = await file.text();
-            const parsed = parsePayloadInput(text);
-            if (Array.isArray(parsed)) {
-              throw new Error(`El archivo ${file.name} contiene un arreglo JSON. Para selección múltiple usa un objeto por archivo.`);
-            }
-
-            return {
-              fileName: file.name,
-              external_uuid: inferExternalUuid(parsed) || null,
-              raw_data: parsed,
-            };
+            const parsed = parsePayloadInput(await file.text());
+            if (Array.isArray(parsed)) throw new Error(`El archivo ${file.name} contiene un arreglo JSON. Usa un objeto por archivo.`);
+            return { fileName: file.name, external_uuid: inferExternalUuid(parsed) || null, raw_data: parsed };
           }),
         );
-
         updateUploadState(payloadType, "selectedFiles", parsedFiles);
         updateUploadState(payloadType, "sourceName", `bulk-detail-files-${parsedFiles.length}`);
         updateUploadState(payloadType, "rawText", "");
         updateUploadState(payloadType, "externalUuid", "");
-        setActionMessage(`${parsedFiles.length} archivos detail listos para carga masiva.`);
+        setUploadMessage(`${parsedFiles.length} ${labels.filesReady}`);
         return;
       }
 
       const file = files[0];
       const text = await file.text();
       const parsed = parsePayloadInput(text);
-
       updateUploadState(payloadType, "selectedFiles", []);
       updateUploadState(payloadType, "rawText", text);
-
-      const inferredUuid = Array.isArray(parsed) ? "" : inferExternalUuid(parsed);
-      if (inferredUuid) {
-        updateUploadState(payloadType, "externalUuid", inferredUuid);
-      }
-
       updateUploadState(payloadType, "sourceName", file.name);
-      setActionMessage(`Archivo ${file.name} listo para ${payloadType}.`);
-    } catch (fileError) {
-      setActionMessage(fileError.message);
+      const inferredUuid = Array.isArray(parsed) ? "" : inferExternalUuid(parsed);
+      if (inferredUuid) updateUploadState(payloadType, "externalUuid", inferredUuid);
+      setUploadMessage(file.name);
+    } catch (error) {
+      setUploadMessage(error.message);
     }
+  }
+
+  async function handleDroppedFiles(payloadType, files) {
+    if (!files?.length) return;
+    await handleFileSelection(payloadType, { target: { files } });
   }
 
   async function sendPayloadUpload(payloadType) {
     const form = uploads[payloadType];
     setBusyUpload(payloadType);
-    setActionMessage("");
-
+    setUploadMessage("");
+    setUploadSummary(null);
     try {
       if (payloadType === "detail" && form.selectedFiles.length > 0) {
-        const response = await fetch(`${PAYLOADS_API_BASE}/upload-bulk/`, {
+        const result = await fetchJson(`${PAYLOADS_API_BASE}/upload-bulk/`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             payload_type: payloadType,
             source_name: form.sourceName,
-            items: form.selectedFiles.map((item) => ({
-              external_uuid: item.external_uuid,
-              raw_data: item.raw_data,
-            })),
+            items: form.selectedFiles.map((item) => ({ external_uuid: item.external_uuid, raw_data: item.raw_data })),
           }),
         });
-
-        const payload = await response.json().catch(() => ({}));
-
-        if (!response.ok) {
-          throw new Error(payload.error || payload.message || "No se pudo subir el lote de details.");
-        }
-
-        setUploads((current) => ({
-          ...current,
-          [payloadType]: {
-            ...current[payloadType],
-            externalUuid: "",
-            rawText: "",
-            selectedFiles: [],
-          },
-        }));
-
-        setActionMessage(`Carga masiva de details completada con ${form.selectedFiles.length} archivo(s).`);
-        setRefreshTick((value) => value + 1);
-        return;
-      }
-
-      const parsed = parsePayloadInput(form.rawText);
-      let response;
-
-      if (Array.isArray(parsed)) {
-        response = await fetch(`${PAYLOADS_API_BASE}/upload-bulk/`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            payload_type: payloadType,
-            source_name: form.sourceName,
-            items: normalizeBulkItems(parsed),
-          }),
-        });
+        setUploadSummary(result.summary || null);
       } else {
-        response = await fetch(`${PAYLOADS_API_BASE}/upload/`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            payload_type: payloadType,
-            source_name: form.sourceName,
-            external_uuid: form.externalUuid || inferExternalUuid(parsed) || null,
-            raw_data: parsed,
-          }),
-        });
-      }
-
-      const payload = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(payload.error || payload.message || "No se pudo subir el payload.");
+        const parsed = parsePayloadInput(form.rawText);
+        if (Array.isArray(parsed)) {
+          const result = await fetchJson(`${PAYLOADS_API_BASE}/upload-bulk/`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              payload_type: payloadType,
+              source_name: form.sourceName,
+              items: normalizeBulkItems(parsed),
+            }),
+          });
+          setUploadSummary(result.summary || null);
+        } else {
+          await fetchJson(`${PAYLOADS_API_BASE}/upload/`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              payload_type: payloadType,
+              source_name: form.sourceName,
+              external_uuid: form.externalUuid || inferExternalUuid(parsed) || null,
+              raw_data: parsed,
+            }),
+          });
+          setUploadSummary({
+            total_received: 1,
+            created: 1,
+            updated: 0,
+            duplicates: 0,
+            failed: 0,
+          });
+        }
       }
 
       setUploads((current) => ({
         ...current,
-        [payloadType]: {
-          ...current[payloadType],
-          externalUuid: "",
-          rawText: "",
-          selectedFiles: [],
-        },
+        [payloadType]: { ...current[payloadType], externalUuid: "", rawText: "", selectedFiles: [] },
       }));
-
-      setActionMessage(
-        Array.isArray(parsed)
-          ? `Carga masiva de ${payloadType} completada.`
-          : `Payload ${payloadType} cargado correctamente.`,
-      );
-      setRefreshTick((value) => value + 1);
-    } catch (uploadError) {
-      setActionMessage(uploadError.message);
+      setUploadMessage(payloadType === "activity" ? labels.uploadActivities : labels.uploadDetails);
+      setRefreshTick((v) => v + 1);
+    } catch (error) {
+      setUploadMessage(error.message);
     } finally {
       setBusyUpload("");
     }
   }
 
-  async function runProcessingAction(actionKey, endpoint) {
-    setBusyAction(actionKey);
-    setActionMessage("");
-
-    try {
-      const response = await fetch(`${PROCESSING_API_BASE}/${endpoint}`, {
-        method: "POST",
-      });
-      const payload = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(payload.error || payload.message || "No se pudo ejecutar el procesamiento.");
-      }
-
-      setActionMessage(payload.message || "Procesamiento ejecutado correctamente.");
-      setRefreshTick((value) => value + 1);
-      return payload;
-    } catch (processingError) {
-      setActionMessage(processingError.message);
-      throw processingError;
-    } finally {
-      setBusyAction("");
-    }
-  }
-
-  async function runFullPipeline() {
-    setBusyAction("pipeline");
-    setActionMessage("");
-
-    try {
-      const activitiesResponse = await fetch(`${PROCESSING_API_BASE}/activities/run/`, { method: "POST" });
-      const activitiesPayload = await activitiesResponse.json().catch(() => ({}));
-
-      if (!activitiesResponse.ok) {
-        throw new Error(activitiesPayload.error || activitiesPayload.message || "Falló el procesamiento de activities.");
-      }
-
-      const detailsResponse = await fetch(`${PROCESSING_API_BASE}/details/run/`, { method: "POST" });
-      const detailsPayload = await detailsResponse.json().catch(() => ({}));
-
-      if (!detailsResponse.ok) {
-        throw new Error(detailsPayload.error || detailsPayload.message || "Falló el procesamiento de details.");
-      }
-
-      setActionMessage("Pipeline completo ejecutado: activities y details procesados.");
-      setRefreshTick((value) => value + 1);
-    } catch (pipelineError) {
-      setActionMessage(pipelineError.message);
-    } finally {
-      setBusyAction("");
-    }
-  }
-
-  async function runLookup() {
-    if (!lookupUuid.trim()) {
-      setLookupResult(null);
-      setActionMessage("Escribe un UUID detail para consultarlo.");
-      return;
-    }
-
-    setLookupLoading(true);
-    setActionMessage("");
-
-    try {
-      const response = await fetch(
-        `${PAYLOADS_API_BASE}/detail-lookup/?external_uuid=${encodeURIComponent(lookupUuid.trim())}`,
-      );
-      const payload = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(payload.message || "No se pudo consultar el UUID.");
-      }
-
-      setLookupResult(payload);
-    } catch (lookupError) {
-      setLookupResult(null);
-      setActionMessage(lookupError.message);
-    } finally {
-      setLookupLoading(false);
-    }
-  }
-
-  const serviceColumns = [
-    { key: "service_type", label: "Servicio" },
-    { key: "service_group", label: "Grupo" },
-    { key: "trips_count", label: "Viajes" },
-    { key: "gross_amount_total", label: "Ingreso", render: (value) => formatMoney(value) },
-    { key: "average_gross_amount", label: "Ticket promedio", render: (value) => formatMoney(value) },
-  ];
-
-  const timeBucketColumns = [
-    { key: "time_bucket", label: "Bucket horario" },
-    { key: "trips_count", label: "Viajes" },
-    { key: "completed_trips", label: "Completados" },
-    { key: "gross_amount_total", label: "Ingreso", render: (value) => formatMoney(value) },
-    { key: "distance_km_total", label: "Distancia", render: (value) => formatDecimal(value, " km") },
-  ];
-
-  const dailyColumns = [
-    { key: "requested_date", label: "Fecha" },
-    { key: "trips_count", label: "Viajes" },
-    { key: "completed_trips", label: "Completados" },
-    { key: "canceled_trips", label: "Cancelados" },
-    { key: "gross_amount_total", label: "Ingreso", render: (value) => formatMoney(value) },
-  ];
-
-  const payloadColumns = [
-    { key: "payload_type", label: "Tipo" },
-    { key: "external_uuid", label: "UUID" },
-    { key: "processing_status", label: "Status" },
-    { key: "processing_attempts", label: "Intentos" },
-    { key: "uploaded_at", label: "Cargado" },
-  ];
-
-  function toggleTheme() {
-    setTheme((current) => (current === "dark" ? "light" : "dark"));
-  }
+  if (authLoading) return <main className="loading">{labels.checking}</main>;
+  if (!user) return <Login labels={labels} credentials={credentials} setCredentials={setCredentials} onSubmit={login} busy={authBusy} />;
+  if (loading || !summary || !queue) return <main className="loading">{labels.loading}</main>;
 
   return (
-    <main className="dashboard-layout">
-      <aside className="sidebar">
-        <div className="sidebar-brand">
-          <div className="sidebar-brand__top">
-            <div>
-              <p className="eyebrow">Uber Dashboard</p>
-              <h1>Consola operativa</h1>
-            </div>
-            <button className="ghost-button ghost-button--compact theme-toggle" type="button" onClick={toggleTheme}>
-              {theme === "dark" ? "Modo claro" : "Modo nocturno"}
+    <main className="product-shell">
+      <header className="topbar">
+        <div className="brand-mark">Uber</div>
+        <nav className="topnav">
+          {topMenus.map((item) => (
+            <button key={item.key} className={activeMenu === item.key ? "topnav__item topnav__item--active" : "topnav__item"} onClick={() => setActiveMenu(item.key)}>
+              {item.label}
             </button>
-          </div>
-          <p>
-            Sube payloads, ejecuta el pipeline y revisa cómo impactan de inmediato en la capa analítica.
-          </p>
+          ))}
+        </nav>
+        <div className="topbar__actions">
+          <button onClick={() => setLanguage((current) => (current === "es" ? "en" : "es"))}>{labels.lang}</button>
+          <button onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}>{theme === "dark" ? labels.light : labels.dark}</button>
+          <button onClick={logout}>{labels.signOut}</button>
         </div>
+      </header>
 
-        <UploadPanel
-          title="Payloads de activities"
-          payloadType="activity"
-          value={uploads.activity.rawText}
-          sourceName={uploads.activity.sourceName}
-          externalUuid={uploads.activity.externalUuid}
-          selectedFilesCount={uploads.activity.selectedFiles.length}
-          onChange={(field, nextValue) => updateUploadState("activity", field, nextValue)}
-          onPickFile={(event) => handleFileSelection("activity", event)}
-          onSubmit={() => sendPayloadUpload("activity")}
-          busy={busyUpload === "activity"}
-        />
-
-        <UploadPanel
-          title="Payloads de details"
-          payloadType="detail"
-          value={uploads.detail.rawText}
-          sourceName={uploads.detail.sourceName}
-          externalUuid={uploads.detail.externalUuid}
-          selectedFilesCount={uploads.detail.selectedFiles.length}
-          onChange={(field, nextValue) => updateUploadState("detail", field, nextValue)}
-          onPickFile={(event) => handleFileSelection("detail", event)}
-          onSubmit={() => sendPayloadUpload("detail")}
-          busy={busyUpload === "detail"}
-        />
-
-        <ActionPanel
-          onRunActivities={() => runProcessingAction("activities", "activities/run/")}
-          onRunDetails={() => runProcessingAction("details", "details/run/")}
-          onRunPipeline={runFullPipeline}
-          busyAction={busyAction}
-        />
-
-        <div className="sidebar-toast">
-          {actionMessage || inferQueueMessage(detailQueue.summary)}
-        </div>
-      </aside>
-
-      <section className="content">
-        <section className="hero">
-          <div className="hero-copy">
-            <p className="eyebrow">Vista analítica</p>
-            <h2>Resultados del pipeline listos para inspección visual.</h2>
-            <p className="hero-text">
-              Cada carga o procesamiento que hagas desde el panel lateral puede reflejarse aquí al instante
-              refrescando métricas, breakdowns y payloads recientes.
-            </p>
-          </div>
-
-          <form className="filter-card" onSubmit={handleSubmit}>
-            <div className="filter-grid">
-              <label>
-                <span>Desde</span>
-                <input
-                  type="date"
-                  value={draftFilters.startDate}
-                  onChange={(event) =>
-                    setDraftFilters((current) => ({ ...current, startDate: event.target.value }))
-                  }
-                />
-              </label>
-
-              <label>
-                <span>Hasta</span>
-                <input
-                  type="date"
-                  value={draftFilters.endDate}
-                  onChange={(event) =>
-                    setDraftFilters((current) => ({ ...current, endDate: event.target.value }))
-                  }
-                />
-              </label>
-            </div>
-
-            <div className="filter-actions">
-              <button type="submit">Aplicar filtros</button>
-              <button type="button" className="ghost-button" onClick={resetFilters}>
-                Limpiar
-              </button>
-            </div>
-          </form>
-        </section>
-
-        {error ? <section className="alert">{error}</section> : null}
-
-        {loading || !summary ? (
-          <section className="loading-panel">Cargando métricas del dashboard...</section>
-        ) : (
+      <section className="content-grid">
+        {activeMenu === "dashboard" ? (
           <>
-            <section className="kpi-grid">
-              <KpiCard eyebrow="Volumen" title="Viajes totales" value={formatDecimal(summary.total_trips)} tone="warm" />
-              <KpiCard eyebrow="Ingresos" title="Ingreso total" value={formatMoney(summary.total_gross_amount)} tone="sun" />
-              <KpiCard eyebrow="Eficiencia" title="Ingreso por km" value={formatMoney(summary.gross_per_km)} tone="cool" />
-              <KpiCard eyebrow="Ritmo" title="Ingreso por hora" value={formatMoney(summary.gross_per_hour)} tone="default" />
-            </section>
-
-            <section className="insight-grid">
-              <div className="panel panel--tall">
-                <div className="panel-heading">
-                  <div>
-                    <p className="eyebrow">Indicadores</p>
-                    <h2>Resumen ejecutivo</h2>
-                  </div>
+            <div className="stat-grid">
+              <ShellCard title={formatNumber(summary.completed_trips)} subtitle={labels.todayTrips}><span className="stat-foot">{formatMoney(summary.gross_per_trip)}</span></ShellCard>
+              <ShellCard title={formatNumber(summary.total_trips)} subtitle={labels.totalTrips}><span className="stat-foot">{formatNumber(summary.completion_rate, "%")}</span></ShellCard>
+              <ShellCard title={formatMoney(summary.gross_per_trip)} subtitle={labels.avgFare}><span className="stat-foot">{formatNumber(summary.average_duration_minutes, " min")}</span></ShellCard>
+              <ShellCard title={formatMoney(summary.total_gross_amount)} subtitle={labels.todayEarnings}><span className="stat-foot">{formatMoney(summary.gross_per_hour)}</span></ShellCard>
+            </div>
+            <div className="dashboard-grid">
+              <ShellCard title={labels.recentTrips} subtitle={labels.dashboard}>
+                <div className="list-table">
+                  {trips.slice(0, 5).map((trip) => <div key={trip.uuid} className="list-row"><strong>{trip.uuid}</strong><span>{trip.service_type}</span><span>{formatMoney(trip.gross_amount)}</span></div>)}
                 </div>
-
-                <div className="metric-list">
-                  <div>
-                    <span>Completados</span>
-                    <strong>{formatDecimal(summary.completed_trips)}</strong>
-                  </div>
-                  <div>
-                    <span>Cancelados</span>
-                    <strong>{formatDecimal(summary.canceled_trips)}</strong>
-                  </div>
-                  <div>
-                    <span>Ticket promedio</span>
-                    <strong>{formatMoney(summary.gross_per_trip)}</strong>
-                  </div>
-                  <div>
-                    <span>Tasa de completado</span>
-                    <strong>{formatDecimal(summary.completion_rate, "%")}</strong>
-                  </div>
-                  <div>
-                    <span>Tasa de cancelación</span>
-                    <strong>{formatDecimal(summary.cancellation_rate, "%")}</strong>
-                  </div>
-                  <div>
-                    <span>Duración promedio</span>
-                    <strong>{formatDecimal(summary.average_duration_minutes, " min")}</strong>
-                  </div>
+              </ShellCard>
+              <ShellCard title={labels.serviceMix} subtitle={labels.earnings}>
+                <div className="bars">
+                  {services.slice(0, 5).map((row) => <div key={`${row.service_group}-${row.service_type}`} className="bar-row"><span>{row.service_group}</span><div className="bar"><i style={{ width: `${Math.max(12, Number(row.trips_count) * 8)}px` }} /></div><strong>{row.trips_count}</strong></div>)}
                 </div>
-              </div>
-
-              <div className="panel panel--accent">
-                <div className="panel-heading">
-                  <div>
-                    <p className="eyebrow">Contexto</p>
-                    <h2>Filtro activo</h2>
-                  </div>
+              </ShellCard>
+              <ShellCard title={labels.processingStatus} subtitle={labels.reports}>
+                <div className="mini-grid">
+                  <div><span>{labels.step2}</span><strong>{queue.summary.pending_download_count}</strong></div>
+                  <div><span>{labels.step3}</span><strong>{queue.summary.uploaded_pending_processing_count}</strong></div>
+                  <div><span>{labels.step4}</span><strong>{queue.summary.processed_detail_count}</strong></div>
                 </div>
-
-                <div className="filter-summary">
-                  <div>
-                    <span>Inicio</span>
-                    <strong>{summary.filters.start_date || "Sin límite"}</strong>
-                  </div>
-                  <div>
-                    <span>Fin</span>
-                    <strong>{summary.filters.end_date || "Sin límite"}</strong>
-                  </div>
-                  <div>
-                    <span>Distancia total</span>
-                    <strong>{formatDecimal(summary.total_distance_km, " km")}</strong>
-                  </div>
-                  <div>
-                    <span>Duración total</span>
-                    <strong>{formatDecimal(summary.total_duration_minutes, " min")}</strong>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <section className="table-grid">
-              <DataTable
-                title="Ingresos por servicio"
-                columns={serviceColumns}
-                rows={serviceRows}
-                emptyMessage="No hay servicios para el rango seleccionado."
-              />
-              <DataTable
-                title="Desempeño por bucket horario"
-                columns={timeBucketColumns}
-                rows={timeBucketRows}
-                emptyMessage="No hay buckets horarios para el rango seleccionado."
-              />
-            </section>
-
-            <DetailQueuePanel
-              pendingDownloadRows={detailQueue.pending_download_items}
-              uploadedPendingRows={detailQueue.uploaded_pending_processing_items}
-              queueSummary={detailQueue.summary}
-            />
-
-            <section className="table-grid">
-              <DetailLookupPanel
-                lookupUuid={lookupUuid}
-                setLookupUuid={setLookupUuid}
-                lookupResult={lookupResult}
-                lookupLoading={lookupLoading}
-                onLookup={runLookup}
-              />
-              <DataTable
-                title="Tendencia diaria"
-                columns={dailyColumns}
-                rows={dailyRows}
-                emptyMessage="No hay datos diarios para el rango seleccionado."
-              />
-            </section>
-
-            <section className="table-grid">
-              <DataTable
-                title="UUIDs / estados recientes"
-                columns={payloadColumns}
-                rows={recentPayloads}
-                emptyMessage="Todavía no hay payloads cargados."
-              />
-            </section>
+              </ShellCard>
+            </div>
           </>
-        )}
+        ) : null}
+
+        {activeMenu === "trips" ? (
+          <div className="section-stack">
+            <div className="feature-grid">
+              <ShellCard title={labels.allTrips} subtitle={labels.trips}><p>{labels.service}: UberTrip</p></ShellCard>
+              <ShellCard title={labels.tripDetail} subtitle={labels.trips}><p>UberTrip + RawPayload.raw_data</p></ShellCard>
+              <ShellCard title={labels.advancedSearch} subtitle={labels.trips}><p>Rango, status, servicio, distancia y ganancia.</p></ShellCard>
+              <ShellCard title={labels.exportData} subtitle={labels.trips}><p>CSV / Excel</p></ShellCard>
+            </div>
+            <ShellCard title={labels.allTrips} subtitle={labels.trips}>
+              <div className="filter-strip">
+                <label><span>{labels.from}</span><input type="date" value={draftFilters.startDate} onChange={(e) => setDraftFilters((c) => ({ ...c, startDate: e.target.value }))} /></label>
+                <label><span>{labels.to}</span><input type="date" value={draftFilters.endDate} onChange={(e) => setDraftFilters((c) => ({ ...c, endDate: e.target.value }))} /></label>
+                <button onClick={() => setFilters(draftFilters)}>{labels.apply}</button>
+                <button className="ghost" onClick={() => { const empty = { startDate: "", endDate: "" }; setDraftFilters(empty); setFilters(empty); }}>{labels.clear}</button>
+              </div>
+              <div className="table-wrap">
+                <table><thead><tr><th>UUID</th><th>{labels.service}</th><th>{labels.distance}</th><th>{labels.duration}</th><th>{labels.earningsAmount}</th><th>{labels.status}</th></tr></thead><tbody>{trips.map((trip) => <tr key={trip.uuid}><td>{trip.uuid}</td><td>{trip.service_type}</td><td>{formatNumber(trip.distance_km, " km")}</td><td>{formatNumber(trip.duration_minutes, " min")}</td><td>{formatMoney(trip.gross_amount)}</td><td>{trip.status}</td></tr>)}</tbody></table>
+              </div>
+            </ShellCard>
+          </div>
+        ) : null}
+
+        {activeMenu === "earnings" ? (
+          <div className="section-stack">
+            <div className="feature-grid">
+              <ShellCard title={labels.dailyEarnings} subtitle={labels.earnings}><strong>{formatMoney(summary.total_gross_amount)}</strong></ShellCard>
+              <ShellCard title={labels.weeklyMonthly} subtitle={labels.earnings}><strong>{formatMoney(summary.gross_per_hour)}</strong></ShellCard>
+              <ShellCard title={labels.byService} subtitle={labels.earnings}><strong>{services.length}</strong></ShellCard>
+              <ShellCard title={labels.trends} subtitle={labels.earnings}><strong>{timeBuckets.length}</strong></ShellCard>
+            </div>
+            <div className="dashboard-grid">
+              <ShellCard title={labels.byService} subtitle={labels.earnings}>
+                <div className="bars">
+                  {services.map((row) => <div key={`${row.service_group}-${row.service_type}`} className="bar-row"><span>{row.service_group}</span><div className="bar"><i style={{ width: `${Math.max(18, Number(row.gross_amount_total) * 4)}px` }} /></div><strong>{formatMoney(row.gross_amount_total)}</strong></div>)}
+                </div>
+              </ShellCard>
+              <ShellCard title={labels.trends} subtitle={labels.earnings}>
+                <div className="bars">
+                  {timeBuckets.map((row) => <div key={row.time_bucket} className="bar-row"><span>{row.time_bucket || "-"}</span><div className="bar"><i style={{ width: `${Math.max(18, Number(row.trips_count) * 18)}px` }} /></div><strong>{row.trips_count}</strong></div>)}
+                </div>
+              </ShellCard>
+            </div>
+          </div>
+        ) : null}
+
+        {activeMenu === "heatmaps" ? (
+          <div className="section-stack">
+            <div className="feature-grid">
+              <ShellCard title={labels.tripsHeatmap} subtitle={labels.heatmaps}><p>pickup_lat / pickup_lng</p></ShellCard>
+              <ShellCard title={labels.pickupHotspots} subtitle={labels.heatmaps}><p>Demanda por zonas</p></ShellCard>
+              <ShellCard title={labels.dropoffHotspots} subtitle={labels.heatmaps}><p>Finalización por zonas</p></ShellCard>
+              <ShellCard title={labels.timeHeatmap} subtitle={labels.heatmaps}><p>hour_of_day / day_of_week</p></ShellCard>
+            </div>
+            <ShellCard title={labels.tripsHeatmap} subtitle={labels.heatmaps}>
+              <div className="map-placeholder">
+                <div className="map-glow map-glow--one" />
+                <div className="map-glow map-glow--two" />
+                <div className="map-glow map-glow--three" />
+              </div>
+            </ShellCard>
+          </div>
+        ) : null}
+
+        {activeMenu === "reports" ? (
+          <div className="section-stack">
+            <div className="feature-grid">
+              <ShellCard title={labels.processingRuns} subtitle={labels.reports}><strong>{runs.length}</strong></ShellCard>
+              <ShellCard title={labels.dataQuality} subtitle={labels.reports}><strong>{payloads.length}</strong></ShellCard>
+              <ShellCard title={labels.customReports} subtitle={labels.reports}><p>Earnings / zonas / eficiencia</p></ShellCard>
+              <ShellCard title={labels.exportReports} subtitle={labels.reports}><p>PDF / CSV</p></ShellCard>
+            </div>
+            <div className="dashboard-grid">
+              <ShellCard title={labels.processingRuns} subtitle={labels.reports}>
+                <div className="table-wrap">
+                  <table><thead><tr><th>{labels.type}</th><th>{labels.status}</th><th>Total</th><th>OK</th><th>Fail</th></tr></thead><tbody>{runs.map((run) => <tr key={run.id}><td>{run.process_type}</td><td>{run.status}</td><td>{run.total_records}</td><td>{run.processed_records}</td><td>{run.failed_records}</td></tr>)}</tbody></table>
+                </div>
+              </ShellCard>
+              <ShellCard title={labels.dataQuality} subtitle={labels.reports}>
+                <div className="mini-grid">
+                  <div><span>Pending downloads</span><strong>{queue.summary.pending_download_count}</strong></div>
+                  <div><span>Uploaded pending</span><strong>{queue.summary.uploaded_pending_processing_count}</strong></div>
+                  <div><span>{labels.step4}</span><strong>{queue.summary.processed_detail_count}</strong></div>
+                </div>
+              </ShellCard>
+            </div>
+          </div>
+        ) : null}
+
+        {activeMenu === "settings" ? (
+          <div className="section-stack">
+            <div className="feature-grid">
+              <ShellCard title={labels.systemConfig} subtitle={labels.settings}><p>Timezone, currency y formato.</p></ShellCard>
+              <ShellCard title={labels.processingControls} subtitle={labels.settings}><p>Conectado a /processing/*</p></ShellCard>
+              <ShellCard title={labels.userSettings} subtitle={labels.settings}><p>Tema e idioma</p></ShellCard>
+              <ShellCard title={labels.dataSources} subtitle={labels.settings}><p>Payloads y rutas de importación</p></ShellCard>
+            </div>
+            <div className="dashboard-grid dashboard-grid--settings">
+              <ShellCard title={labels.activityPayloads} subtitle={labels.uploadActivities}>
+                <div className="upload-form">
+                  <label><span>{labels.batchName}</span><input value={uploads.activity.sourceName} onChange={(e) => updateUploadState("activity", "sourceName", e.target.value)} /></label>
+                  <label><span>{labels.optionalUuid}</span><input value={uploads.activity.externalUuid} onChange={(e) => updateUploadState("activity", "externalUuid", e.target.value)} /></label>
+                  <div className="dropzone" onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); handleDroppedFiles("activity", Array.from(e.dataTransfer.files || [])); }}>
+                    <strong>{labels.dropJson}</strong>
+                    <span>{labels.dropHint}</span>
+                  </div>
+                  <label><span>{labels.chooseJsonFile}</span><input type="file" accept=".json,application/json" onChange={(e) => handleFileSelection("activity", e)} /></label>
+                  <label><span>{labels.pasteActivityJson}</span><textarea rows="8" value={uploads.activity.rawText} onChange={(e) => updateUploadState("activity", "rawText", e.target.value)} /></label>
+                  <button onClick={() => sendPayloadUpload("activity")}>{busyUpload === "activity" ? labels.sending : labels.uploadActivities}</button>
+                </div>
+              </ShellCard>
+              <ShellCard title={labels.detailPayloads} subtitle={labels.uploadDetails}>
+                <div className="upload-form">
+                  <label><span>{labels.batchName}</span><input value={uploads.detail.sourceName} onChange={(e) => updateUploadState("detail", "sourceName", e.target.value)} /></label>
+                  <label><span>{labels.optionalManualUuid}</span><input value={uploads.detail.externalUuid} onChange={(e) => updateUploadState("detail", "externalUuid", e.target.value)} /></label>
+                  <div className="dropzone" onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); handleDroppedFiles("detail", Array.from(e.dataTransfer.files || [])); }}>
+                    <strong>{labels.dropJson}</strong>
+                    <span>{labels.dropHint}</span>
+                  </div>
+                  <label><span>{labels.chooseManyJson}</span><input type="file" accept=".json,application/json" multiple onChange={(e) => handleFileSelection("detail", e)} /></label>
+                  {uploads.detail.selectedFiles.length > 0 ? <p className="upload-help">{uploads.detail.selectedFiles.length} {labels.filesReady}</p> : null}
+                  <label><span>{labels.pasteDetailJson}</span><textarea rows="8" value={uploads.detail.rawText} onChange={(e) => updateUploadState("detail", "rawText", e.target.value)} /></label>
+                  <button onClick={() => sendPayloadUpload("detail")}>{busyUpload === "detail" ? labels.sending : labels.uploadDetails}</button>
+                </div>
+              </ShellCard>
+            </div>
+            <div className="dashboard-grid">
+              <ShellCard title={labels.processingControls} subtitle={labels.settings}>
+                <div className="action-stack">
+                  <button onClick={() => runAction(`${PROCESSING_API_BASE}/activities/run/`, "activities")}>{busyAction === "activities" ? "..." : labels.runActivities}</button>
+                  <button onClick={() => runAction(`${PROCESSING_API_BASE}/details/run/`, "details")}>{busyAction === "details" ? "..." : labels.runDetails}</button>
+                  <button onClick={() => runAction(`${PROCESSING_API_BASE}/activities/run/`, "pipeline").then(() => runAction(`${PROCESSING_API_BASE}/details/run/`, "pipeline"))}>{busyAction === "pipeline" ? "..." : labels.runPipeline}</button>
+                </div>
+              </ShellCard>
+              <ShellCard title={labels.userSettings} subtitle={labels.settings}>
+                <div className="action-stack">
+                  <button onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}>{theme === "dark" ? labels.light : labels.dark}</button>
+                  <button onClick={() => setLanguage((current) => (current === "es" ? "en" : "es"))}>{labels.lang}</button>
+                </div>
+              </ShellCard>
+            </div>
+            <div className="dashboard-grid dashboard-grid--settings">
+              <ShellCard title={labels.lastUpload} subtitle={labels.settings}>
+                {uploadSummary ? (
+                  <div className="mini-grid">
+                    <div><span>{labels.totalReceived}</span><strong>{uploadSummary.total_received ?? 0}</strong></div>
+                    <div><span>{labels.created}</span><strong>{uploadSummary.created ?? 0}</strong></div>
+                    <div><span>{labels.updated}</span><strong>{uploadSummary.updated ?? 0}</strong></div>
+                    <div><span>{labels.duplicates}</span><strong>{uploadSummary.duplicates ?? 0}</strong></div>
+                    <div><span>{labels.failed}</span><strong>{uploadSummary.failed ?? 0}</strong></div>
+                  </div>
+                ) : (
+                  <p>{labels.empty}</p>
+                )}
+              </ShellCard>
+              <ShellCard title={labels.uploadHistory} subtitle={labels.settings}>
+                <div className="table-wrap">
+                  <table><thead><tr><th>{labels.type}</th><th>UUID</th><th>{labels.status}</th><th>{labels.uploaded}</th></tr></thead><tbody>{payloads.map((payload) => <tr key={`${payload.payload_type}-${payload.id}`}><td>{payload.payload_type}</td><td>{payload.external_uuid || "-"}</td><td>{payload.processing_status}</td><td>{payload.uploaded_at}</td></tr>)}</tbody></table>
+                </div>
+              </ShellCard>
+            </div>
+            <div className="dashboard-grid dashboard-grid--settings">
+              <ShellCard title={labels.pendingUuidList} subtitle={labels.settings} actions={<button className="ghost" onClick={() => navigator.clipboard?.writeText(queue.pending_download_items.map((item) => item.external_uuid).filter(Boolean).join("\n"))}>{labels.copyUuids}</button>}>
+                <p className="upload-help">{labels.pendingUuidHelp}</p>
+                <div className="table-wrap">
+                  <table><thead><tr><th>UUID</th><th>{labels.status}</th><th>{labels.uploaded}</th></tr></thead><tbody>{queue.pending_download_items.map((item) => <tr key={`pending-${item.id}`}><td>{item.external_uuid}</td><td>{item.processing_status}</td><td>{item.uploaded_at || "-"}</td></tr>)}</tbody></table>
+                </div>
+              </ShellCard>
+              <ShellCard title={labels.dataSources} subtitle={labels.settings}>
+                <div className="mini-grid">
+                  <div><span>{labels.step2}</span><strong>{queue.summary.pending_download_count}</strong></div>
+                  <div><span>{labels.step3}</span><strong>{queue.summary.uploaded_pending_processing_count}</strong></div>
+                  <div><span>{labels.step4}</span><strong>{queue.summary.processed_detail_count}</strong></div>
+                </div>
+              </ShellCard>
+            </div>
+            {uploadMessage ? <div className="upload-status">{uploadMessage}</div> : null}
+          </div>
+        ) : null}
       </section>
     </main>
   );
