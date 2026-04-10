@@ -335,6 +335,14 @@ textarea {
   background: linear-gradient(180deg, rgba(13, 107, 111, 0.08), rgba(255, 255, 255, 0.88));
 }
 
+.panel--queue {
+  background: linear-gradient(180deg, rgba(191, 91, 44, 0.08), rgba(255, 255, 255, 0.92));
+}
+
+.panel--workflow {
+  background: linear-gradient(180deg, rgba(209, 157, 13, 0.1), rgba(255, 255, 255, 0.92));
+}
+
 .metric-list,
 .filter-summary {
   display: grid;
@@ -398,6 +406,60 @@ tbody tr:last-child td {
   margin: 0;
 }
 
+.workflow-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.workflow-card {
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.workflow-card span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.workflow-card strong {
+  display: block;
+  margin-top: 10px;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1.8rem;
+  letter-spacing: -0.05em;
+}
+
+.queue-caption {
+  margin: 0 0 16px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.uuid-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.uuid-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 999px;
+  background: rgba(31, 26, 23, 0.06);
+  border: 1px solid var(--line);
+  font-size: 0.84rem;
+}
+
+.ghost-button--compact {
+  padding: 10px 14px;
+}
+
 @media (max-width: 1180px) {
   .dashboard-layout {
     grid-template-columns: 1fr;
@@ -414,6 +476,10 @@ tbody tr:last-child td {
   .table-grid,
   .kpi-grid {
     grid-template-columns: 1fr;
+  }
+
+  .workflow-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -436,5 +502,9 @@ tbody tr:last-child td {
 
   .filter-actions {
     flex-direction: column;
+  }
+
+  .workflow-grid {
+    grid-template-columns: 1fr;
   }
 }

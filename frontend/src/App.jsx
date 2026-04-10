@@ -86,6 +86,157 @@ function DataTable({ title, columns, rows, emptyMessage }) {
   );
 }
 
+async function copyListToClipboard(rows) {
+  const text = rows.map((row) => row.external_uuid).filter(Boolean).join("\n");
+  await navigator.clipboard.writeText(text);
+}
+
+function QueuePanel({ title, eyebrow, caption, rows, buttonLabel }) {
+  async function handleCopy() {
+    await copyListToClipboard(rows);
+  }
+
+  return (
+    <section className="panel panel--queue">
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">{eyebrow}</p>
+          <h2>{title}</h2>
+        </div>
+        <button className="ghost-button ghost-button--compact" type="button" onClick={handleCopy} disabled={!rows.length}>
+          {buttonLabel}
+        </button>
+      </div>
+
+      {rows.length === 0 ? <p className="empty-state">{caption}</p> : (
+        <>
+          <p className="queue-caption">{caption}</p>
+          <div className="uuid-chip-list">
+            {rows.map((row) => (
+              <code key={row.id} className="uuid-chip">
+                {row.external_uuid}
+              </code>
+            ))}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+function WorkflowStatusPanel({ queueSummary }) {
+  const cards = [
+    { label: "Activities pendientes", value: queueSummary.pending_activity_count },
+    { label: "UUIDs por descargar", value: queueSummary.pending_download_count },
+    { label: "Details subidos por procesar", value: queueSummary.uploaded_pending_processing_count },
+    { label: "Details procesados", value: queueSummary.processed_detail_count },
+  ];
+
+  return (
+    <section className="panel panel--workflow">
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">Estado del flujo</p>
+          <h2>¿En dónde estás parado?</h2>
+        </div>
+      </div>
+
+      <div className="workflow-grid">
+        {cards.map((card) => (
+          <div key={card.label} className="workflow-card">
+            <span>{card.label}</span>
+            <strong>{formatDecimal(card.value)}</strong>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function DetailQueuePanel({ pendingDownloadRows, uploadedPendingRows, queueSummary }) {
+  return (
+    <>
+      <WorkflowStatusPanel queueSummary={queueSummary} />
+      <div className="table-grid">
+        <QueuePanel
+          title="Detail UUIDs por descargar"
+          eyebrow="Paso 2"
+          caption="Procesa activities para generar placeholders. Luego usa esta lista para descargar manualmente los details desde Uber."
+          rows={pendingDownloadRows}
+          buttonLabel="Copiar UUIDs"
+        />
+        <QueuePanel
+          title="Details subidos por procesar"
+          eyebrow="Paso 4"
+          caption="Estos details ya fueron subidos al sistema. Solo falta ejecutar el procesamiento para normalizarlos en UberTrip."
+          rows={uploadedPendingRows}
+          buttonLabel="Copiar UUIDs"
+        />
+      </div>
+    </>
+  );
+}
+
+function inferQueueMessage(queueSummary) {
+  if (queueSummary.pending_activity_count > 0) {
+    return "Aún tienes activities pendientes por procesar.";
+  }
+
+  if (queueSummary.pending_download_count > 0) {
+    return "Ya puedes descargar details desde Uber usando la lista de UUIDs pendientes.";
+  }
+
+  if (queueSummary.uploaded_pending_processing_count > 0) {
+    return "Ya subiste details. El siguiente paso es procesarlos.";
+  }
+
+  if (queueSummary.processed_detail_count > 0) {
+    return "El flujo ya avanzó hasta details procesados. Puedes revisar métricas o cargar nuevos chunks.";
+  }
+
+  return "Aún no hay actividad en el pipeline. Empieza subiendo activities.";
+}
+
+function DetailQueueLegacyPanel({ rows }) {
+  async function copyAllUuids() {
+    const text = rows.map((row) => row.external_uuid).filter(Boolean).join("\n");
+    await navigator.clipboard.writeText(text);
+  }
+
+  return (
+    <section className="panel panel--queue">
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">Descarga manual</p>
+          <h2>Detail UUIDs pendientes</h2>
+        </div>
+        <button className="ghost-button ghost-button--compact" type="button" onClick={copyAllUuids} disabled={!rows.length}>
+          Copiar lista
+        </button>
+      </div>
+
+      {rows.length === 0 ? (
+        <p className="empty-state">
+          Aún no hay UUIDs pendientes generados desde activities.
+        </p>
+      ) : (
+        <>
+          <p className="queue-caption">
+            Esta es tu lista operativa para ir a Uber, descargar manualmente los details y después subirlos en lote.
+          </p>
+          <div className="uuid-chip-list">
+            {rows.map((row) => (
+              <code key={row.id} className="uuid-chip">
+                {row.external_uuid}
+              </code>
+            ))}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
 function parsePayloadInput(rawText) {
   if (!rawText.trim()) {
     throw new Error("Pega un JSON válido antes de enviarlo.");
@@ -248,6 +399,16 @@ export default function App() {
   const [timeBucketRows, setTimeBucketRows] = useState([]);
   const [dailyRows, setDailyRows] = useState([]);
   const [recentPayloads, setRecentPayloads] = useState([]);
+  const [detailQueue, setDetailQueue] = useState({
+    summary: {
+      pending_activity_count: 0,
+      pending_download_count: 0,
+      uploaded_pending_processing_count: 0,
+      processed_detail_count: 0,
+    },
+    pending_download_items: [],
+    uploaded_pending_processing_items: [],
+  });
   const [loading, setLoading] = useState(true);
   const [refreshTick, setRefreshTick] = useState(0);
   const [error, setError] = useState("");
@@ -263,13 +424,14 @@ export default function App() {
       setError("");
 
       try {
-        const [summaryResponse, serviceResponse, timeBucketResponse, dailyResponse, payloadsResponse] =
+        const [summaryResponse, serviceResponse, timeBucketResponse, dailyResponse, payloadsResponse, detailQueueResponse] =
           await Promise.all([
             fetch(buildMetricsUrl("summary/", filters)),
             fetch(buildMetricsUrl("by-service/", filters)),
             fetch(buildMetricsUrl("by-time-bucket/", filters)),
             fetch(buildMetricsUrl("by-day/", filters)),
             fetch(`${PAYLOADS_API_BASE}/`),
+            fetch(`${PAYLOADS_API_BASE}/work-queue/`),
           ]);
 
         const responses = [
@@ -278,6 +440,7 @@ export default function App() {
           timeBucketResponse,
           dailyResponse,
           payloadsResponse,
+          detailQueueResponse,
         ];
         const failedResponse = responses.find((response) => !response.ok);
 
@@ -286,7 +449,7 @@ export default function App() {
           throw new Error(payload.error || "No fue posible cargar el dashboard.");
         }
 
-        const [summaryData, serviceData, timeBucketData, dailyData, payloadsData] = await Promise.all(
+        const [summaryData, serviceData, timeBucketData, dailyData, payloadsData, detailQueueData] = await Promise.all(
           responses.map((response) => response.json()),
         );
 
@@ -299,6 +462,20 @@ export default function App() {
         setTimeBucketRows(timeBucketData);
         setDailyRows(dailyData);
         setRecentPayloads(Array.isArray(payloadsData) ? payloadsData.slice(0, 8) : []);
+        setDetailQueue(
+          detailQueueData && typeof detailQueueData === "object" && !Array.isArray(detailQueueData)
+            ? detailQueueData
+            : {
+                summary: {
+                  pending_activity_count: 0,
+                  pending_download_count: 0,
+                  uploaded_pending_processing_count: 0,
+                  processed_detail_count: 0,
+                },
+                pending_download_items: [],
+                uploaded_pending_processing_items: [],
+              },
+        );
       } catch (fetchError) {
         if (!cancelled) {
           setError(fetchError.message || "Ocurrió un error al cargar el dashboard.");
@@ -615,7 +792,9 @@ export default function App() {
           busyAction={busyAction}
         />
 
-        {actionMessage ? <div className="sidebar-toast">{actionMessage}</div> : null}
+        <div className="sidebar-toast">
+          {actionMessage || inferQueueMessage(detailQueue.summary)}
+        </div>
       </aside>
 
       <section className="content">
@@ -757,6 +936,12 @@ export default function App() {
               />
             </section>
 
+            <DetailQueuePanel
+              pendingDownloadRows={detailQueue.pending_download_items}
+              uploadedPendingRows={detailQueue.uploaded_pending_processing_items}
+              queueSummary={detailQueue.summary}
+            />
+
             <section className="table-grid">
               <DataTable
                 title="Tendencia diaria"
@@ -765,7 +950,7 @@ export default function App() {
                 emptyMessage="No hay datos diarios para el rango seleccionado."
               />
               <DataTable
-                title="Payloads recientes"
+                title="UUIDs / estados recientes"
                 columns={payloadColumns}
                 rows={recentPayloads}
                 emptyMessage="Todavía no hay payloads cargados."

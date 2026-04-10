@@ -11,6 +11,23 @@ from .serializers import (
 )
 
 
+def has_real_detail_payload(raw_data):
+    if not isinstance(raw_data, dict):
+        return False
+
+    if "payload" in raw_data:
+        payload = raw_data.get("payload")
+        if payload is None:
+            return False
+        if isinstance(payload, dict):
+            return len(payload) > 0
+        if isinstance(payload, list):
+            return len(payload) > 0
+        return bool(payload)
+
+    return len(raw_data) > 0
+
+
 class RawPayloadCreateView(generics.CreateAPIView):
     queryset = RawPayload.objects.all()
     serializer_class = RawPayloadCreateSerializer
@@ -36,8 +53,29 @@ class RawPayloadCreateView(generics.CreateAPIView):
 
 
 class RawPayloadListView(generics.ListAPIView):
-    queryset = RawPayload.objects.all().order_by("-created_at")
     serializer_class = RawPayloadListSerializer
+
+    def get_queryset(self):
+        queryset = RawPayload.objects.all().order_by("-created_at")
+
+        payload_type = self.request.query_params.get("payload_type")
+        processing_status = self.request.query_params.get("processing_status")
+        source_name_prefix = self.request.query_params.get("source_name_prefix")
+        external_uuid = self.request.query_params.get("external_uuid")
+
+        if payload_type:
+            queryset = queryset.filter(payload_type=payload_type)
+
+        if processing_status:
+            queryset = queryset.filter(processing_status=processing_status)
+
+        if source_name_prefix:
+            queryset = queryset.filter(source_name__startswith=source_name_prefix)
+
+        if external_uuid:
+            queryset = queryset.filter(external_uuid=external_uuid)
+
+        return queryset
 
 
 class RawPayloadBulkCreateView(APIView):
@@ -112,4 +150,54 @@ class RawPayloadBulkCreateView(APIView):
                 "failed_items": failed_items,
             },
             status=status.HTTP_201_CREATED,
+        )
+
+
+class PayloadWorkQueueView(APIView):
+    def get(self, request, *args, **kwargs):
+        detail_payloads = RawPayload.objects.filter(
+            payload_type=RawPayload.PayloadType.DETAIL,
+        ).order_by("-created_at")
+        activity_payloads = RawPayload.objects.filter(
+            payload_type=RawPayload.PayloadType.ACTIVITY,
+        )
+
+        pending_download_items = []
+        uploaded_pending_processing_items = []
+
+        for payload in detail_payloads:
+            item = {
+                "id": payload.id,
+                "external_uuid": payload.external_uuid,
+                "source_name": payload.source_name,
+                "processing_status": payload.processing_status,
+                "uploaded_at": payload.uploaded_at,
+            }
+
+            if not has_real_detail_payload(payload.raw_data):
+                if payload.processing_status == RawPayload.ProcessingStatus.PENDING:
+                    pending_download_items.append(item)
+                continue
+
+            if payload.processing_status == RawPayload.ProcessingStatus.PENDING:
+                uploaded_pending_processing_items.append(item)
+
+        processed_details_count = detail_payloads.filter(
+            processing_status=RawPayload.ProcessingStatus.PROCESSED,
+        ).count()
+
+        return Response(
+            {
+                "summary": {
+                    "pending_activity_count": activity_payloads.filter(
+                        processing_status=RawPayload.ProcessingStatus.PENDING,
+                    ).count(),
+                    "pending_download_count": len(pending_download_items),
+                    "uploaded_pending_processing_count": len(uploaded_pending_processing_items),
+                    "processed_detail_count": processed_details_count,
+                },
+                "pending_download_items": pending_download_items,
+                "uploaded_pending_processing_items": uploaded_pending_processing_items,
+            },
+            status=status.HTTP_200_OK,
         )
