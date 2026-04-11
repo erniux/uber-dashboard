@@ -59,7 +59,7 @@ class RawPayloadListView(generics.ListAPIView):
     serializer_class = RawPayloadListSerializer
 
     def get_queryset(self):
-        queryset = RawPayload.objects.all().order_by("-created_at")
+        queryset = RawPayload.objects.all().order_by("-updated_at", "-created_at")
 
         payload_type = self.request.query_params.get("payload_type")
         processing_status = self.request.query_params.get("processing_status")

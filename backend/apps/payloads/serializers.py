@@ -126,6 +126,8 @@ class RawPayloadListSerializer(serializers.ModelSerializer):
             "processing_attempts",
             "uploaded_at",
             "last_processed_at",
+            "created_at",
+            "updated_at",
         )
 
 

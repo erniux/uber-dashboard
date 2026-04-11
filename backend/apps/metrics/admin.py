@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from apps.metrics.models import UberTrip
+from apps.metrics.models import OperatingCost, UberTrip
 
 
 @admin.register(UberTrip)
@@ -31,6 +31,30 @@ class UberTripAdmin(admin.ModelAdmin):
         "is_pool_type",
         "is_surge",
         "requested_date",
+    )
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+    )
+
+
+@admin.register(OperatingCost)
+class OperatingCostAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "cost_date",
+        "category",
+        "title",
+        "amount",
+        "created_at",
+    )
+    search_fields = (
+        "title",
+        "description",
+    )
+    list_filter = (
+        "category",
+        "cost_date",
     )
     readonly_fields = (
         "created_at",

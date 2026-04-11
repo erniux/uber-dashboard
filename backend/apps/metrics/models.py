@@ -75,3 +75,32 @@ class UberTrip(models.Model):
 
     def __str__(self):
         return f"{self.service_type or 'Trip'} - {self.uuid}"
+
+
+class OperatingCost(models.Model):
+    CATEGORY_CHOICES = [
+        ("fuel", "Gasolina"),
+        ("maintenance", "Mantenimiento"),
+        ("tolls", "Peajes"),
+        ("taxes", "Impuestos"),
+        ("verification", "Verificacion vehicular"),
+        ("insurance", "Seguro"),
+        ("other", "Otro"),
+    ]
+
+    category = models.CharField(max_length=30, choices=CATEGORY_CHOICES, default="other")
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True, default="")
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    cost_date = models.DateField()
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-cost_date", "-created_at"]
+        verbose_name = "Operating Cost"
+        verbose_name_plural = "Operating Costs"
+
+    def __str__(self):
+        return f"{self.title} - {self.amount}"

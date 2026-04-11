@@ -114,3 +114,19 @@ class PayloadWorkQueueTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.data["found"])
         self.assertEqual(response.data["current_step"], "not_found")
+
+    def test_payload_list_includes_created_and_updated_timestamps(self):
+        payload = RawPayload.objects.create(
+            payload_type=RawPayload.PayloadType.DETAIL,
+            external_uuid="detail-list",
+            source_name="detail-list.json",
+            raw_data={"uuid": "detail-list", "payload": {"data": {"metadata": {"uuid": "detail-list"}}}},
+            processing_status=RawPayload.ProcessingStatus.PENDING,
+        )
+
+        response = self.client.get("/api/payloads/")
+
+        self.assertEqual(response.status_code, 200)
+        row = next(item for item in response.data if item["id"] == payload.id)
+        self.assertIn("created_at", row)
+        self.assertIn("updated_at", row)

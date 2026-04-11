@@ -1,16 +1,17 @@
 from decimal import Decimal
 from datetime import date, datetime, timezone
-
 from django.test import TestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APITestCase
 
-from apps.metrics.models import UberTrip
+from apps.metrics.models import OperatingCost, UberTrip
 from apps.metrics.services.dashboard_metrics import (
     get_daily_breakdown,
     get_service_breakdown,
     get_summary_metrics,
     get_time_bucket_breakdown,
 )
+from apps.metrics.services.cost_metrics import get_cost_dashboard
 from apps.metrics.services.trip_extractor import extract_basic_trip_data
 from apps.payloads.models import RawPayload
 
@@ -198,6 +199,33 @@ class DashboardMetricsServiceTests(TestCase):
         self.assertEqual(breakdown[1]["requested_date"], date(2024, 4, 10))
         self.assertEqual(breakdown[1]["gross_amount_total"], Decimal("80"))
 
+    def test_cost_dashboard_returns_financial_summary(self):
+        OperatingCost.objects.create(
+            category="fuel",
+            title="Gasolina semana 1",
+            amount=Decimal("60.00"),
+            cost_date=date(2024, 4, 9),
+        )
+        OperatingCost.objects.create(
+            category="tolls",
+            title="Peajes semana 1",
+            amount=Decimal("30.00"),
+            cost_date=date(2024, 4, 10),
+        )
+
+        summary = get_cost_dashboard()
+
+        self.assertEqual(summary["period_income"], Decimal("180.00"))
+        self.assertEqual(summary["period_cost"], Decimal("90.00"))
+        self.assertEqual(summary["period_utility"], Decimal("90.00"))
+        self.assertEqual(summary["adjusted_roi"], Decimal("100.00"))
+        self.assertEqual(summary["cost_entries_count"], 2)
+        self.assertEqual(summary["cost_category_counts"][0]["category"], "fuel")
+        self.assertEqual(summary["cost_category_counts"][0]["entries_count"], 1)
+        self.assertEqual(len(summary["top_combos"]), 2)
+        self.assertIsNotNone(summary["best_combo"])
+        self.assertIsNotNone(summary["worst_combo"])
+
 
 class DashboardMetricsApiTests(APITestCase):
     def setUp(self):
@@ -308,8 +336,140 @@ class DashboardMetricsApiTests(APITestCase):
         self.assertEqual(response.data[0]["uuid"], "trip-2")
         self.assertEqual(response.data[1]["status"], "completed")
 
+    def test_map_points_endpoint_returns_only_trips_with_coordinates(self):
+        trip_with_coords = UberTrip.objects.get(uuid="trip-1")
+        trip_with_coords.pickup_lat = Decimal("19.432608")
+        trip_with_coords.pickup_lng = Decimal("-99.133209")
+        trip_with_coords.dropoff_lat = Decimal("19.427025")
+        trip_with_coords.dropoff_lng = Decimal("-99.167665")
+        trip_with_coords.pickup_address = "Origen"
+        trip_with_coords.dropoff_address = "Destino"
+        trip_with_coords.save()
+
+        response = self.client.get("/api/metrics/map-points/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["uuid"], "trip-1")
+        self.assertEqual(response.data[0]["pickup_address"], "Origen")
+        self.assertEqual(response.data[0]["dropoff_address"], "Destino")
+
+    def test_map_points_endpoint_supports_date_filters(self):
+        trip_with_coords = UberTrip.objects.get(uuid="trip-2")
+        trip_with_coords.pickup_lat = Decimal("19.400000")
+        trip_with_coords.pickup_lng = Decimal("-99.100000")
+        trip_with_coords.dropoff_lat = Decimal("19.410000")
+        trip_with_coords.dropoff_lng = Decimal("-99.110000")
+        trip_with_coords.save()
+
+        response = self.client.get(
+            "/api/metrics/map-points/",
+            {"start_date": "2024-04-10", "end_date": "2024-04-10"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["uuid"], "trip-2")
+
     def test_invalid_date_returns_400(self):
         response = self.client.get("/api/metrics/summary/", {"start_date": "2024/04/10"})
 
         self.assertEqual(response.status_code, 400)
         self.assertIn("YYYY-MM-DD", response.data["error"])
+
+    def test_cost_entries_endpoint_creates_and_lists_entries(self):
+        create_response = self.client.post(
+            "/api/metrics/cost-entries/",
+            {
+                "category": "fuel",
+                "title": "Gasolina abril",
+                "description": "Carga completa",
+                "amount": "450.50",
+                "cost_date": "2024-04-10",
+            },
+            format="json",
+        )
+
+        self.assertEqual(create_response.status_code, 201)
+
+        list_response = self.client.get("/api/metrics/cost-entries/")
+        self.assertEqual(list_response.status_code, 200)
+        self.assertEqual(len(list_response.data), 1)
+        self.assertEqual(list_response.data[0]["category"], "fuel")
+
+    def test_cost_dashboard_endpoint_returns_combo_analysis(self):
+        OperatingCost.objects.create(
+            category="maintenance",
+            title="Servicio preventivo",
+            amount=Decimal("90.00"),
+            cost_date=date(2024, 4, 10),
+        )
+
+        response = self.client.get("/api/metrics/cost-dashboard/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["period_income"], Decimal("180"))
+        self.assertEqual(response.data["period_cost"], Decimal("90"))
+        self.assertEqual(response.data["cost_entries_count"], 1)
+        self.assertEqual(response.data["cost_category_counts"][0]["category"], "maintenance")
+        self.assertEqual(response.data["cost_category_counts"][0]["entries_count"], 1)
+        self.assertEqual(len(response.data["top_combos"]), 2)
+        self.assertIn("display_name", response.data["top_combos"][0])
+
+    def test_cost_dashboard_endpoint_respects_date_filters(self):
+        self._create_trip(
+            payload_uuid="payload-3",
+            trip_uuid="trip-3",
+            service_group="mobility",
+            service_type="Uber Planet",
+            time_bucket="tarde",
+            requested_date=date(2024, 5, 2),
+            gross_amount=Decimal("60.00"),
+            distance_km=Decimal("6.00"),
+            duration_minutes=Decimal("18.00"),
+            is_completed=True,
+            is_canceled=False,
+        )
+        OperatingCost.objects.create(
+            category="fuel",
+            title="Gasolina abril",
+            amount=Decimal("40.00"),
+            cost_date=date(2024, 4, 10),
+        )
+        OperatingCost.objects.create(
+            category="tolls",
+            title="Peajes mayo",
+            amount=Decimal("15.00"),
+            cost_date=date(2024, 5, 2),
+        )
+
+        response = self.client.get(
+            "/api/metrics/cost-dashboard/",
+            {"start_date": "2024-05-01", "end_date": "2024-05-31"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["period_income"], Decimal("60"))
+        self.assertEqual(response.data["period_cost"], Decimal("15"))
+        self.assertEqual(response.data["cost_entries_count"], 1)
+        self.assertEqual(response.data["cost_category_counts"][0]["category"], "tolls")
+        self.assertEqual(response.data["filters"]["start_date"], "2024-05-01")
+        self.assertEqual(response.data["filters"]["end_date"], "2024-05-31")
+
+    def test_cost_csv_upload_endpoint_imports_rows(self):
+        csv_bytes = (
+            "fecha,concepto,monto,medio\n"
+            "09/02/2026,gasolina,500,tarjeta\n"
+            "12/03/2026,impuestos,536,transferencia\n"
+        ).encode("utf-8")
+
+        response = self.client.post(
+            "/api/metrics/cost-entries/upload-csv/",
+            {"file": SimpleUploadedFile("costos.csv", csv_bytes, content_type="text/csv")},
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["summary"]["created"], 2)
+        self.assertEqual(response.data["summary"]["failed"], 0)
+        self.assertEqual(OperatingCost.objects.count(), 2)
+        self.assertEqual(OperatingCost.objects.order_by("cost_date").first().category, "fuel")
