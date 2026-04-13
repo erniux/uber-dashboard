@@ -97,8 +97,12 @@ const COPY = {
     mapRoutesVisible: "Rutas visibles",
     mapLoading: "Cargando mapa...",
     mapEmpty: "No hay viajes con coordenadas para el rango seleccionado.",
+    mapDisplayLabel: "Mostrar en mapa",
     mapLegendPickup: "Origen",
     mapLegendDropoff: "Destino",
+    mapShowPickup: "Solo origen",
+    mapShowDropoff: "Solo destino",
+    mapShowBoth: "Ambos",
     processingRuns: "Ejecuciones de procesamiento",
     dataQuality: "Calidad de datos",
     customReports: "Reportes personalizados",
@@ -169,6 +173,8 @@ const COPY = {
     earningsAmount: "Ganancia",
     status: "Status",
     uploaded: "Cargado",
+    requestedAt: "Fecha y hora",
+    timeSlot: "Franja horaria",
     expand: "Expandir",
     collapse: "Ocultar",
   },
@@ -262,8 +268,12 @@ const COPY = {
     mapRoutesVisible: "Visible routes",
     mapLoading: "Loading map...",
     mapEmpty: "No trips with coordinates were found for the selected range.",
+    mapDisplayLabel: "Show on map",
     mapLegendPickup: "Pickup",
     mapLegendDropoff: "Dropoff",
+    mapShowPickup: "Pickup only",
+    mapShowDropoff: "Dropoff only",
+    mapShowBoth: "Both",
     processingRuns: "Processing Runs",
     dataQuality: "Data Quality",
     customReports: "Custom Reports",
@@ -334,6 +344,8 @@ const COPY = {
     earningsAmount: "Earnings",
     status: "Status",
     uploaded: "Uploaded",
+    requestedAt: "Date & time",
+    timeSlot: "Time slot",
     expand: "Expand",
     collapse: "Hide",
   },
@@ -345,6 +357,15 @@ const number = new Intl.NumberFormat("es-MX", { maximumFractionDigits: 2 });
 function formatMoney(value) { return money.format(Number(value ?? 0)); }
 function formatNumber(value, suffix = "") { return `${number.format(Number(value ?? 0))}${suffix}`; }
 function withUuid(template, uuid) { return template.replace("{uuid}", uuid); }
+function formatDateTime(value, language = "es") {
+  if (!value) return "-";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "-";
+  return new Intl.DateTimeFormat(language === "es" ? "es-MX" : "en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(parsed);
+}
 
 function isSameCalendarDay(value, year, month, day) {
   if (!value) return false;
@@ -551,7 +572,7 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-function TripMap({ points, labels }) {
+function TripMap({ points, labels, displayMode, language }) {
   const mapElementRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const mapLayerRef = useRef(null);
@@ -590,40 +611,66 @@ function TripMap({ points, labels }) {
             ? [Number(point.dropoff_lat), Number(point.dropoff_lng)]
             : null;
 
-          const popupContent = `
+          const buildTooltipContent = ({ currentLabel, currentAddress, pairedLabel, pairedAddress }) => `
             <div class="map-popup">
               <strong>${escapeHtml(point.service_type || point.service_group || point.uuid)}</strong>
               <span>UUID: ${escapeHtml(point.uuid)}</span>
+              <span>${escapeHtml(labels.requestedAt)}: ${escapeHtml(formatDateTime(point.requested_at, language))}</span>
+              <span>${escapeHtml(labels.timeSlot)}: ${escapeHtml(point.time_bucket || "-")}</span>
               <span>${escapeHtml(labels.status)}: ${escapeHtml(point.status || "-")}</span>
               <span>${escapeHtml(labels.earningsAmount)}: ${escapeHtml(formatMoney(point.gross_amount))}</span>
-              <span>${escapeHtml(labels.mapLegendPickup)}: ${escapeHtml(point.pickup_address || "-")}</span>
-              <span>${escapeHtml(labels.mapLegendDropoff)}: ${escapeHtml(point.dropoff_address || "-")}</span>
+              <span>${escapeHtml(currentLabel)}: ${escapeHtml(currentAddress || "-")}</span>
+              <span>${escapeHtml(pairedLabel)}: ${escapeHtml(pairedAddress || "-")}</span>
             </div>
           `;
 
-          if (pickup) {
-            L.circleMarker(pickup, {
+          if (pickup && displayMode !== "dropoff") {
+            const tooltipContent = buildTooltipContent({
+              currentLabel: labels.mapLegendPickup,
+              currentAddress: point.pickup_address,
+              pairedLabel: labels.mapLegendDropoff,
+              pairedAddress: point.dropoff_address,
+            });
+            const pickupMarker = L.circleMarker(pickup, {
               radius: 6,
               color: "#22c55e",
               weight: 2,
               fillColor: "#22c55e",
               fillOpacity: 0.8,
-            }).bindPopup(popupContent).addTo(layerGroup);
+            }).bindTooltip(tooltipContent, {
+              direction: "top",
+              sticky: true,
+              opacity: 1,
+              className: "map-tooltip",
+            }).addTo(layerGroup);
+            pickupMarker.on("mouseover", () => pickupMarker.openTooltip());
             bounds.push(pickup);
           }
 
-          if (dropoff) {
-            L.circleMarker(dropoff, {
+          if (dropoff && displayMode !== "pickup") {
+            const tooltipContent = buildTooltipContent({
+              currentLabel: labels.mapLegendDropoff,
+              currentAddress: point.dropoff_address,
+              pairedLabel: labels.mapLegendPickup,
+              pairedAddress: point.pickup_address,
+            });
+            const dropoffMarker = L.circleMarker(dropoff, {
               radius: 6,
               color: "#8b5cf6",
               weight: 2,
               fillColor: "#8b5cf6",
               fillOpacity: 0.8,
-            }).bindPopup(popupContent).addTo(layerGroup);
+            }).bindTooltip(tooltipContent, {
+              direction: "top",
+              sticky: true,
+              opacity: 1,
+              className: "map-tooltip",
+            }).addTo(layerGroup);
+            dropoffMarker.on("mouseover", () => dropoffMarker.openTooltip());
             bounds.push(dropoff);
           }
 
-          if (pickup && dropoff) {
+          if (pickup && dropoff && displayMode === "both") {
             L.polyline([pickup, dropoff], {
               color: "#62d2b1",
               weight: 3,
@@ -645,7 +692,7 @@ function TripMap({ points, labels }) {
     return () => {
       cancelled = true;
     };
-  }, [points, labels]);
+  }, [displayMode, labels, language, points]);
 
   useEffect(() => {
     return () => {
@@ -662,8 +709,8 @@ function TripMap({ points, labels }) {
       <div ref={mapElementRef} className="map-live" />
       {!points.length ? <div className="map-live__empty">{labels.mapEmpty}</div> : null}
       <div className="map-live__legend">
-        <span><i className="map-live__dot map-live__dot--pickup" />{labels.mapLegendPickup}</span>
-        <span><i className="map-live__dot map-live__dot--dropoff" />{labels.mapLegendDropoff}</span>
+        {displayMode !== "dropoff" ? <span><i className="map-live__dot map-live__dot--pickup" />{labels.mapLegendPickup}</span> : null}
+        {displayMode !== "pickup" ? <span><i className="map-live__dot map-live__dot--dropoff" />{labels.mapLegendDropoff}</span> : null}
       </div>
     </div>
   );
@@ -799,6 +846,7 @@ export default function App() {
   const [dashboardCostSummary, setDashboardCostSummary] = useState(null);
   const [mapFilters, setMapFilters] = useState(() => getDashboardPeriodFilters("week"));
   const [mapDraftFilters, setMapDraftFilters] = useState(() => getDashboardPeriodFilters("week"));
+  const [mapDisplayMode, setMapDisplayMode] = useState("both");
   const [mapPoints, setMapPoints] = useState([]);
   const [mapLoading, setMapLoading] = useState(true);
   const [costFilters, setCostFilters] = useState({ startDate: "", endDate: "" });
@@ -998,19 +1046,24 @@ export default function App() {
 
   const costCategorySummary = useMemo(() => getCostCategorySummary(costEntries), [costEntries]);
   const mapSummary = useMemo(() => {
-    const pickupPoints = mapPoints.filter((point) => point.pickup_lat != null && point.pickup_lng != null).length;
-    const dropoffPoints = mapPoints.filter((point) => point.dropoff_lat != null && point.dropoff_lng != null).length;
+    const pickupTrips = mapPoints.filter((point) => point.pickup_lat != null && point.pickup_lng != null);
+    const dropoffTrips = mapPoints.filter((point) => point.dropoff_lat != null && point.dropoff_lng != null);
     const routesVisible = mapPoints.filter(
       (point) => point.pickup_lat != null && point.pickup_lng != null && point.dropoff_lat != null && point.dropoff_lng != null,
     ).length;
+    const tripsWithCoordinates = mapDisplayMode === "pickup"
+      ? pickupTrips.length
+      : mapDisplayMode === "dropoff"
+        ? dropoffTrips.length
+        : mapPoints.length;
 
     return {
-      tripsWithCoordinates: mapPoints.length,
-      pickupPoints,
-      dropoffPoints,
-      routesVisible,
+      tripsWithCoordinates,
+      pickupPoints: mapDisplayMode === "dropoff" ? 0 : pickupTrips.length,
+      dropoffPoints: mapDisplayMode === "pickup" ? 0 : dropoffTrips.length,
+      routesVisible: mapDisplayMode === "both" ? routesVisible : 0,
     };
-  }, [mapPoints]);
+  }, [mapDisplayMode, mapPoints]);
 
   async function login(event) {
     event.preventDefault();
@@ -1529,6 +1582,14 @@ export default function App() {
             <div className="filter-strip">
               <label><span>{labels.from}</span><input type="date" value={mapDraftFilters.startDate} onChange={(e) => setMapDraftFilters((current) => ({ ...current, startDate: e.target.value }))} /></label>
               <label><span>{labels.to}</span><input type="date" value={mapDraftFilters.endDate} onChange={(e) => setMapDraftFilters((current) => ({ ...current, endDate: e.target.value }))} /></label>
+              <div className="filter-strip__group">
+                <span>{labels.mapDisplayLabel}</span>
+                <div className="chip-row">
+                  <button className={`period-chip ${mapDisplayMode === "pickup" ? "period-chip--active" : ""}`} type="button" onClick={() => setMapDisplayMode("pickup")}>{labels.mapShowPickup}</button>
+                  <button className={`period-chip ${mapDisplayMode === "dropoff" ? "period-chip--active" : ""}`} type="button" onClick={() => setMapDisplayMode("dropoff")}>{labels.mapShowDropoff}</button>
+                  <button className={`period-chip ${mapDisplayMode === "both" ? "period-chip--active" : ""}`} type="button" onClick={() => setMapDisplayMode("both")}>{labels.mapShowBoth}</button>
+                </div>
+              </div>
               <button type="button" onClick={() => setMapFilters(mapDraftFilters)}>{labels.apply}</button>
               <button className="ghost" type="button" onClick={() => { const nextFilters = getDashboardPeriodFilters("week"); setMapDraftFilters(nextFilters); setMapFilters(nextFilters); }}>{labels.clear}</button>
             </div>
@@ -1539,7 +1600,7 @@ export default function App() {
               <ShellCard title={formatNumber(mapSummary.routesVisible)} subtitle={labels.mapRoutesVisible} />
             </div>
             <ShellCard title={labels.tripsHeatmap} subtitle={labels.heatmaps}>
-              {mapLoading ? <div className="map-live__empty map-live__empty--static">{labels.mapLoading}</div> : <TripMap points={mapPoints} labels={labels} />}
+              {mapLoading ? <div className="map-live__empty map-live__empty--static">{labels.mapLoading}</div> : <TripMap points={mapPoints} labels={labels} displayMode={mapDisplayMode} language={language} />}
             </ShellCard>
           </div>
         ) : null}

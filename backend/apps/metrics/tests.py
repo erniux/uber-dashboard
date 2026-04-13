@@ -84,6 +84,32 @@ class TripExtractorTests(TestCase):
         self.assertEqual(trip_data["pickup_lat"], Decimal("19.432608"))
         self.assertEqual(trip_data["dropoff_lng"], Decimal("-99.167665"))
 
+    def test_extract_basic_trip_data_uses_payload_timezone_for_time_bucket(self):
+        requested_at_utc = datetime(2026, 3, 10, 2, 9, tzinfo=timezone.utc)
+        raw_data = {
+            "uuid": "trip-local-time",
+            "payload": {
+                "status": "success",
+                "data": {
+                    "metadata": {
+                        "uuid": "trip-local-time",
+                        "statusType": "COMPLETED",
+                        "vehicleType": "Uber X",
+                        "timeZone": "America/Mexico_City",
+                        "requestedAt": int(requested_at_utc.timestamp()),
+                        "formattedTotal": "$95.55",
+                    },
+                    "cards": [],
+                },
+            },
+        }
+
+        trip_data = extract_basic_trip_data(raw_data)
+
+        self.assertEqual(trip_data["hour_of_day"], 20)
+        self.assertEqual(trip_data["time_bucket"], "noche")
+        self.assertEqual(str(trip_data["requested_date"]), "2026-03-09")
+
 
 class DashboardMetricsServiceTests(TestCase):
     def setUp(self):

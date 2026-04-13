@@ -2,6 +2,9 @@ from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 import re
 from urllib.parse import parse_qs, unquote, urlparse
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+from django.conf import settings
 
 
 def find_component(cards, component_type):
@@ -88,15 +91,24 @@ def parse_duration_minutes(value):
     return total_minutes
 
 
-def parse_requested_at(timestamp_value):
+def resolve_timezone(timezone_name=None):
+    candidate = timezone_name or settings.TIME_ZONE
+    try:
+        return ZoneInfo(candidate)
+    except ZoneInfoNotFoundError:
+        return ZoneInfo(settings.TIME_ZONE)
+
+
+def parse_requested_at(timestamp_value, timezone_name=None):
     """
-    Convierte unix timestamp a datetime aware en UTC.
+    Convierte unix timestamp a datetime aware en la zona horaria del payload.
     """
     if timestamp_value in (None, ""):
         return None
 
     try:
-        return datetime.fromtimestamp(timestamp_value, tz=timezone.utc)
+        utc_dt = datetime.fromtimestamp(timestamp_value, tz=timezone.utc)
+        return utc_dt.astimezone(resolve_timezone(timezone_name))
     except (TypeError, ValueError, OSError):
         return None
 
@@ -249,7 +261,10 @@ def extract_basic_trip_data(raw_data):
         elif address_type == "DROPOFF":
             dropoff_address = address_text
 
-    requested_at = parse_requested_at(metadata.get("requestedAt"))
+    requested_at = parse_requested_at(
+        metadata.get("requestedAt"),
+        metadata.get("timeZone"),
+    )
     hour_of_day = requested_at.hour if requested_at else None
     service_type = metadata.get("vehicleType") or hero.get("vehicleType")
 
